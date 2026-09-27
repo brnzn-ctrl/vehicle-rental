@@ -1,68 +1,83 @@
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
+/**
+ * One login screen, two audiences: pick "Staff" to log into the admin/employee
+ * dashboard (checked against the `staff` table), or "Customer" to log into
+ * the customer portal (checked against the `customers` table). Customers can
+ * also self-register here — staff accounts stay admin-managed only.
+ */
 public class LoginForm extends JFrame {
 
-    private JTextField usernameField;
-    private JPasswordField passwordField;
-
-    // Hardcoded credentials for demo purposes
-    private static final String VALID_USERNAME = "admin";
-    private static final String VALID_PASSWORD = "password123";
+    private final JComboBox<String> roleBox = new JComboBox<>(new String[]{"Staff", "Customer"});
+    private final JTextField usernameField = new JTextField(15);
+    private final JPasswordField passwordField = new JPasswordField(15);
+    private final StaffDAO staffDAO = new StaffDAO();
+    private final CustomerDAO customerDAO = new CustomerDAO();
 
     public LoginForm() {
-        setTitle("Login Form");
-        setSize(350, 200);
+        setTitle("Rexter the molester Rentals — Login");
+        setSize(420, 340);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setResizable(false);
+        UITheme.styleFrame(this);
 
-        JPanel panel = new JPanel();
-        panel.setLayout(new GridBagLayout());
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(UITheme.BG_DARK);
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(8, 8, 8, 8);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Username label + field
-        gbc.gridx = 0; gbc.gridy = 0;
-        panel.add(new JLabel("Username:"), gbc);
+        JLabel title = UITheme.titleLabel("Rexter the molester Rentals");
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2; gbc.anchor = GridBagConstraints.CENTER;
+        panel.add(title, gbc);
+        gbc.gridwidth = 1; gbc.anchor = GridBagConstraints.WEST;
 
-        usernameField = new JTextField(15);
-        gbc.gridx = 1; gbc.gridy = 0;
+        gbc.gridx = 0; gbc.gridy = 1;
+        panel.add(themedLabel("Login as:"), gbc);
+        gbc.gridx = 1; gbc.gridy = 1;
+        panel.add(roleBox, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 2;
+        panel.add(themedLabel("Username:"), gbc);
+        gbc.gridx = 1; gbc.gridy = 2;
         panel.add(usernameField, gbc);
 
-        // Password label + field
-        gbc.gridx = 0; gbc.gridy = 1;
-        panel.add(new JLabel("Password:"), gbc);
-
-        passwordField = new JPasswordField(15);
-        gbc.gridx = 1; gbc.gridy = 1;
+        gbc.gridx = 0; gbc.gridy = 3;
+        panel.add(themedLabel("Password:"), gbc);
+        gbc.gridx = 1; gbc.gridy = 3;
         panel.add(passwordField, gbc);
 
-        // Login button
-        JButton loginButton = new JButton("Login");
-        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2;
+        JButton loginButton = UITheme.primaryButton("Login");
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
         gbc.anchor = GridBagConstraints.CENTER;
         panel.add(loginButton, gbc);
 
-        loginButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                handleLogin();
-            }
-        });
+        JButton registerButton = new JButton("Create New Account (Customer)");
+        registerButton.setBackground(UITheme.BG_PANEL);
+        registerButton.setForeground(UITheme.TEXT_LIGHT);
+        registerButton.setFocusPainted(false);
+        gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 2;
+        panel.add(registerButton, gbc);
 
-        // Allow pressing Enter in password field to submit
-        passwordField.addActionListener(e -> handleLogin());
+        loginButton.addActionListener(e -> handleLogin());
+        passwordField.addActionListener(e -> handleLogin()); // Enter key submits
+        registerButton.addActionListener(e -> openRegisterDialog());
 
         add(panel);
+    }
+
+    private JLabel themedLabel(String text) {
+        JLabel l = new JLabel(text);
+        l.setForeground(UITheme.TEXT_LIGHT);
+        return l;
     }
 
     private void handleLogin() {
         String username = usernameField.getText().trim();
         String password = new String(passwordField.getPassword());
+        String role = (String) roleBox.getSelectedItem();
 
         if (username.isEmpty() || password.isEmpty()) {
             JOptionPane.showMessageDialog(this,
@@ -71,23 +86,39 @@ public class LoginForm extends JFrame {
             return;
         }
 
-        if (username.equals(VALID_USERNAME) && password.equals(VALID_PASSWORD)) {
-            JOptionPane.showMessageDialog(this,
-                    "Login successful! Welcome, " + username + ".",
-                    "Success", JOptionPane.INFORMATION_MESSAGE);
-            // Proceed to next screen here
+        if ("Staff".equals(role)) {
+            Staff loggedInStaff = staffDAO.login(username, password);
+            if (loggedInStaff != null) {
+                new MainFrame(loggedInStaff).setVisible(true);
+                dispose();
+                return;
+            }
         } else {
-            JOptionPane.showMessageDialog(this,
-                    "Invalid username or password.",
-                    "Login Failed", JOptionPane.ERROR_MESSAGE);
-            passwordField.setText("");
+            Customer loggedInCustomer = customerDAO.login(username, password);
+            if (loggedInCustomer != null) {
+                new CustomerFrame(loggedInCustomer).setVisible(true);
+                dispose();
+                return;
+            }
+        }
+
+        JOptionPane.showMessageDialog(this,
+                "Invalid username or password for the selected role.",
+                "Login Failed", JOptionPane.ERROR_MESSAGE);
+        passwordField.setText("");
+    }
+
+    private void openRegisterDialog() {
+        RegisterDialog dialog = new RegisterDialog(this, customerDAO);
+        dialog.setVisible(true);
+        if (dialog.registeredUsername != null) {
+            usernameField.setText(dialog.registeredUsername);
+            roleBox.setSelectedItem("Customer");
+            passwordField.requestFocus();
         }
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            LoginForm form = new LoginForm();
-            form.setVisible(true);
-        });
+        SwingUtilities.invokeLater(() -> new LoginForm().setVisible(true));
     }
 }
