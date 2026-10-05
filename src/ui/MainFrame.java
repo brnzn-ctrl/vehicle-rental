@@ -18,7 +18,8 @@ public class MainFrame extends JFrame {
     public MainFrame(Staff loggedInStaff) {
         setTitle("Restro Rentals — " + loggedInStaff.getRole().toUpperCase() + " (" + loggedInStaff.getFirstName() + ")");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(1050, 680);
+        setSize(1310, 940);
+        setResizable(false);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
         UITheme.styleFrame(this);
@@ -36,7 +37,7 @@ public class MainFrame extends JFrame {
         JPanel sidebar = new JPanel();
         sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
         sidebar.setBackground(UITheme.BG_PANEL);
-        sidebar.setBorder(BorderFactory.createEmptyBorder(16, 10, 10, 10));
+        sidebar.setBorder(BorderFactory.createEmptyBorder(16, 10, 10, 16));
 
         JLabel brand = new JLabel("RESTRO RENTALS");
         brand.setForeground(UITheme.RED_ACCENT);
@@ -90,7 +91,7 @@ public class MainFrame extends JFrame {
 
         JPanel sidebarWrap = new JPanel(new BorderLayout());
         sidebarWrap.setBackground(UITheme.BG_PANEL);
-        sidebarWrap.setPreferredSize(new Dimension(250, 0));
+        sidebarWrap.setPreferredSize(new Dimension(285, 0));
         sidebarWrap.add(navScroll, BorderLayout.CENTER);
         sidebarWrap.add(logoutBar, BorderLayout.SOUTH);
 

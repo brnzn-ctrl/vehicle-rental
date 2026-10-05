@@ -12,7 +12,7 @@
 --  Default logins: admin/admin123, employee1/employee123, maria + pedro/customer123
 -- =====================================================================
 
-CONNECT 'jdbc:derby:VehicleRentalDB;create=true';
+--CONNECT 'jdbc:derby:VehicleRentalDB;create=true';
 
 -- ---------- OPTIONAL: wipe everything first (children before parents) ----------
 -- DROP TABLE expenses;        DROP TABLE inventory_stock;  DROP TABLE payments;
