@@ -4,60 +4,90 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 
+/**
+ * Look of the staff / admin screens (clean light layout, white cards, navy text, red accent).
+ * Only colours, fonts and shapes live here: no application logic.
+ * The constant names are unchanged from the old blue theme, so every screen picks the new look up automatically
+ * (BG_DARK is now the soft page background, BG_PANEL the white card colour, TEXT_LIGHT the dark main text colour,
+ * RED_ACCENT is now really red).
+ */
 public final class UITheme {
     private UITheme() { }
 
-    public static final Color BG_DARK      = new Color(11, 61, 145);   // bright royal blue background
-    public static final Color BG_PANEL     = new Color(16, 82, 178);   // slightly lighter blue panel background
-    public static final Color RED_ACCENT   = new Color(212, 175, 55);  // gold accent (primary buttons, price tags)
-    public static final Color RED_ACCENT_HOVER = new Color(230, 195, 90);
-    public static final Color TEXT_LIGHT   = new Color(255, 255, 255);
-    public static final Color TEXT_MUTED   = new Color(210, 225, 250);
+    // ---- core palette (names kept for compatibility, values are the new design)
+    public static final Color BG_DARK      = new Color(243, 246, 250);  // page background
+    public static final Color BG_PANEL     = new Color(255, 255, 255);  // cards, sidebar
+    public static final Color RED_ACCENT   = new Color(255, 45, 70);    // primary accent (buttons, highlights)
+    public static final Color RED_ACCENT_HOVER = new Color(230, 30, 56);
+    public static final Color TEXT_LIGHT   = new Color(27, 37, 54);     // main text (dark navy)
+    public static final Color TEXT_MUTED   = new Color(122, 133, 153);  // secondary text
     public static final Color CARD_BG      = new Color(255, 255, 255);
-    public static final Color GREEN_MONEY  = new Color(40, 160, 90);
-    public static final Color GOLD         = RED_ACCENT;               // clearer name for new code
+    public static final Color GREEN_MONEY  = new Color(31, 168, 107);
+    public static final Color GOLD         = RED_ACCENT;                // old name, still works
 
-    public static final Font FONT_TITLE  = new Font("Segoe UI", Font.BOLD, 30);
-    public static final Font FONT_HEADER = new Font("Segoe UI", Font.BOLD, 20);
-    public static final Font FONT_BODY   = new Font("Segoe UI", Font.PLAIN, 18);
-    public static final Font FONT_PRICE  = new Font("Segoe UI", Font.BOLD, 18);
+    // ---- extra design tokens
+    public static final Color NAVY         = new Color(30, 43, 60);
+    public static final Color TINT         = new Color(231, 240, 249);  // soft blue (selected menu item, icon circles)
+    public static final Color BORDER       = new Color(230, 235, 242);
+    public static final Color AMBER        = new Color(245, 166, 35);
+    public static final Color BLUE         = new Color(59, 130, 246);
+    public static final Color GRAY_SOFT    = new Color(226, 232, 240);
 
-  
+    public static final String FONT_FAMILY = "Segoe UI";
+    public static final Font FONT_TITLE  = new Font(FONT_FAMILY, Font.BOLD, 26);
+    public static final Font FONT_HEADER = new Font(FONT_FAMILY, Font.BOLD, 16);
+    public static final Font FONT_BODY   = new Font(FONT_FAMILY, Font.PLAIN, 14);
+    public static final Font FONT_PRICE  = new Font(FONT_FAMILY, Font.BOLD, 14);
+
+    public static Font font(int style, float size) { return new Font(FONT_FAMILY, style, 1).deriveFont(style, size); }
+
+    /** Installs the global look (fonts, colours, rounded buttons, flat tabs and scroll bars, table styling). */
     public static void applyGlobalFontScale() {
-        Font base = new Font("Segoe UI", Font.PLAIN, 18);
-        Font bold = new Font("Segoe UI", Font.BOLD, 18);
-        java.util.List<String> plainKeys = java.util.List.of(
-            "Label.font", "Button.font", "TextField.font", "PasswordField.font",
-            "TextArea.font", "ComboBox.font", "CheckBox.font", "RadioButton.font",
-            "Table.font", "TableHeader.font", "List.font", "TabbedPane.font",
-            "ToolTip.font", "OptionPane.messageFont", "OptionPane.buttonFont",
-            "TextPane.font", "EditorPane.font", "Spinner.font", "MenuItem.font",
-            "Menu.font", "MenuBar.font", "PopupMenu.font", "Panel.font"
-        );
-        for (String key : plainKeys) UIManager.put(key, base);
-        UIManager.put("TitledBorder.font", bold);
-        // Table rows need to be taller to fit the bigger font, or text gets clipped.
-        UIManager.put("Table.rowHeight", 32);
+        ModernUI.install();
     }
 
-    /** Applies the dark background + light text to any top-level frame's content. */
-    public static void styleFrame(JFrame frame) {
-        frame.getContentPane().setBackground(BG_DARK);
-    }
+    /** Applies the page background to any top-level frame's content. */
+   public static void styleFrame(JFrame frame) {
+    frame.getContentPane().setBackground(BG_DARK);
 
-    /** A gold "royal" button — used for primary actions (Login, Reserve, Add, etc.). */
+    try {
+        java.net.URL url = UITheme.class.getResource("/resources/RESTRO_LOGO.png");
+        if (url != null) {
+            java.awt.image.BufferedImage src = javax.imageio.ImageIO.read(url);
+
+            java.util.List<Image> icons = new java.util.ArrayList<>();
+            for (int size : new int[]{16, 32, 64, 128}) {
+                java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
+                        size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g = img.createGraphics();
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                        RenderingHints.VALUE_ANTIALIAS_ON);
+                g.drawImage(src, 0, 0, size, size, null);
+                g.dispose();
+                icons.add(img);
+            }
+            frame.setIconImages(icons);
+        }
+    } catch (java.io.IOException e) {
+        e.printStackTrace();
+    }
+   }
+
+    /** The red primary button used for main actions (Login, Reserve, Add, etc.). */
     public static JButton primaryButton(String text) {
         JButton btn = new JButton(text);
         btn.setBackground(RED_ACCENT);
-        btn.setForeground(BG_DARK);
-        btn.setFont(FONT_HEADER);
+        btn.setForeground(Color.WHITE);
+        btn.setFont(font(Font.BOLD, 14));
         btn.setFocusPainted(false);
-        btn.setBorder(new EmptyBorder(8, 16, 8, 16));
+        btn.setBorder(new EmptyBorder(9, 18, 9, 18));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return btn;
     }
 
-    /** A plain dark sidebar/secondary button. */
+    /** A plain white secondary button. */
     public static JButton sidebarButton(String text) {
         JButton btn = new JButton(text);
         btn.setBackground(BG_PANEL);
@@ -65,7 +95,7 @@ public final class UITheme {
         btn.setFont(FONT_BODY);
         btn.setFocusPainted(false);
         btn.setAlignmentX(Component.LEFT_ALIGNMENT);
-        btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
+        btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
         btn.setBorder(new EmptyBorder(6, 12, 6, 12));
         btn.setHorizontalAlignment(SwingConstants.LEFT);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -79,8 +109,10 @@ public final class UITheme {
         return l;
     }
 
-    /** Formats a peso price the same way everywhere: "₱1,500.00" */
+    /** Formats a peso price the same way everywhere: "\u20B11,500.00" */
     public static String peso(java.math.BigDecimal amount) {
         return "\u20B1" + String.format("%,.2f", amount);
     }
+    
+    
 }

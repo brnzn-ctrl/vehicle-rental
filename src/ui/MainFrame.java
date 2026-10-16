@@ -3,21 +3,45 @@ package ui;
 import util.UITheme;
 import model.Staff;
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Sidebar + CardLayout shell. Each menu button just swaps a panel in/out —
  * add a new module by writing a JPanel (see VehiclePanel) and adding one addModule(...) line below.
+ * (Look: white sidebar with line icons, soft-blue selected item, page header with the signed-in user.)
  */
 public class MainFrame extends JFrame {
+
+    private static final Map<String, String> ICONS = new HashMap<>();
+    static {
+        ICONS.put("Dashboard", "dashboard");
+        ICONS.put("Vehicle Fleet", "car");
+        ICONS.put("Customer Accounts", "users");
+        ICONS.put("Reservations", "calendar");
+        ICONS.put("Rental Checkout", "key");
+        ICONS.put("Vehicle Returns", "return");
+        ICONS.put("Payment History", "card");
+        ICONS.put("Stock & Supplies", "box");
+        ICONS.put("Expenses", "wallet");
+        ICONS.put("Reports & Analytics", "chart");
+        ICONS.put("Vehicle Categories", "tag");
+        ICONS.put("Discount Events", "percent");
+        ICONS.put("Staff Accounts", "shield");
+    }
 
     private final CardLayout cards = new CardLayout();
     private final JPanel content = new JPanel(cards);
     private final JMenu modulesMenu = new JMenu("Modules");
-    private JButton selectedSidebarButton;
+    private final Map<String, NavButton> navButtons = new HashMap<>();
+    private final Staff staff;
+    private NavButton selectedSidebarButton;
 
     public MainFrame(Staff loggedInStaff) {
+        this.staff = loggedInStaff;
         setTitle("Restro Rentals — " + loggedInStaff.getRole().toUpperCase() + " (" + loggedInStaff.getFirstName() + ")");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(1310, 940);
@@ -25,6 +49,7 @@ public class MainFrame extends JFrame {
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
         UITheme.styleFrame(this);
+        content.setBackground(UITheme.BG_DARK);
 
         boolean isAdmin = "admin".equalsIgnoreCase(loggedInStaff.getRole());
 
@@ -39,22 +64,20 @@ public class MainFrame extends JFrame {
         JPanel sidebar = new JPanel();
         sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
         sidebar.setBackground(UITheme.BG_PANEL);
-        sidebar.setBorder(BorderFactory.createEmptyBorder(16, 10, 10, 16));
-
-        JLabel brand = new JLabel("RESTRO RENTALS");
-        brand.setForeground(UITheme.RED_ACCENT);
-        brand.setFont(UITheme.FONT_TITLE);
-        brand.setAlignmentX(Component.LEFT_ALIGNMENT);
-        sidebar.add(brand);
-        sidebar.add(Box.createVerticalStrut(16));
+        sidebar.setBorder(BorderFactory.createEmptyBorder(8, 14, 10, 14));
+        sidebar.add(brand());
+        sidebar.add(Box.createVerticalStrut(10));
 
         // Every module screen is registered here (Reports and the admin modules only for administrators).
-        addModule(sidebar, "Dashboard", "Quick overview of vehicles, rentals, reservations, income, and expenses.",
-            new DashboardPanel("Welcome, " + loggedInStaff.getFirstName() + " (" + loggedInStaff.getRole() + ")"));
+        section(sidebar, "MAIN");
+        DashboardPanel dashboard = new DashboardPanel("Welcome, " + loggedInStaff.getFirstName() + " (" + loggedInStaff.getRole() + ")");
+        addModule(sidebar, "Dashboard", "Quick overview of vehicles, rentals, reservations, income, and expenses.", dashboard);
         addModule(sidebar, "Vehicle Fleet", "Add and maintain vehicles, availability, rates, and photos.",
             new VehiclePanel(loggedInStaff));
+        dashboard.setOnViewFleet(() -> showModule("Vehicle Fleet"));
         addModule(sidebar, "Customer Accounts", "View and manage customer profiles and account details.",
             new CustomerPanel(loggedInStaff));
+        section(sidebar, "OPERATIONS");
         addModule(sidebar, "Reservations", "Manage bookings, review customer requests, and approve or reject pending reservations.",
             buildTabbedModule(
                 new String[] {"Reservations", "Pending Reservations"},
@@ -68,6 +91,7 @@ public class MainFrame extends JFrame {
             new RentalsPanel(loggedInStaff));
         addModule(sidebar, "Vehicle Returns", "Record returned vehicles, condition notes, fees, and final payment.",
             new ReturnsPanel(loggedInStaff));
+        section(sidebar, "BUSINESS");
         addModule(sidebar, "Payment History", "Review payments recorded for completed rental transactions.",
             new PaymentsPanel(loggedInStaff));
         addModule(sidebar, "Stock & Supplies", "Receive stock, manage supply items and reorder thresholds, and maintain supplier details.",
@@ -85,6 +109,7 @@ public class MainFrame extends JFrame {
 
         // Reports is admin-only — employees don't see it in the sidebar at all.
         if (isAdmin) {
+            section(sidebar, "ADMIN");
             addModule(sidebar, "Reports & Analytics", "Review income summaries, charts, and detailed business reports.",
                 buildTabbedModule(
                     new String[] {"Summary Reports", "Detailed Reports"},
@@ -104,26 +129,32 @@ public class MainFrame extends JFrame {
 
         sidebar.add(Box.createVerticalGlue());
 
-        // The menu now has many modules, so it scrolls; the Log Out and Exit buttons stay pinned at the bottom.
+        // The menu has many modules, so it scrolls; the Log Out and Exit buttons stay pinned at the bottom.
         JScrollPane navScroll = new JScrollPane(sidebar,
             ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         navScroll.setBorder(null);
         navScroll.getViewport().setBackground(UITheme.BG_PANEL);
         navScroll.getVerticalScrollBar().setUnitIncrement(16);
 
-        JButton logout = UITheme.primaryButton("Log Out");
+        NavButton logout = new NavButton("Log Out", "logout");
+        logout.setDanger(true);
         logout.addActionListener(e -> AppMenu.logout(this));
-        JButton exit = UITheme.primaryButton("Exit");
+        NavButton exit = new NavButton("Exit", "power");
         exit.addActionListener(e -> AppMenu.exit(this));
-        JPanel logoutBar = new JPanel(new GridLayout(2, 1, 0, 6));
+        JPanel logoutBar = new JPanel();
+        logoutBar.setLayout(new BoxLayout(logoutBar, BoxLayout.Y_AXIS));
         logoutBar.setBackground(UITheme.BG_PANEL);
-        logoutBar.setBorder(BorderFactory.createEmptyBorder(8, 10, 10, 10));
+        logoutBar.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(1, 0, 0, 0, UITheme.BORDER),
+            BorderFactory.createEmptyBorder(10, 14, 12, 14)));
         logoutBar.add(logout);
+        logoutBar.add(Box.createVerticalStrut(4));
         logoutBar.add(exit);
 
         JPanel sidebarWrap = new JPanel(new BorderLayout());
         sidebarWrap.setBackground(UITheme.BG_PANEL);
-        sidebarWrap.setPreferredSize(new Dimension(285, 0));
+        sidebarWrap.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, UITheme.BORDER));
+        sidebarWrap.setPreferredSize(new Dimension(250, 0));
         sidebarWrap.add(navScroll, BorderLayout.CENTER);
         sidebarWrap.add(logoutBar, BorderLayout.SOUTH);
 
@@ -133,6 +164,8 @@ public class MainFrame extends JFrame {
         updateSelectedSidebarButton("Dashboard");
     }
 
+    // ------------------------------------------------------------------ pages
+
     private JPanel buildTabbedModule(String[] tabLabels, String[] descriptions, JPanel[] tabPanels) {
         if (tabLabels.length != tabPanels.length || tabLabels.length != descriptions.length) {
             throw new IllegalArgumentException("Tab labels, descriptions, and panels must match in count.");
@@ -140,46 +173,172 @@ public class MainFrame extends JFrame {
 
         JTabbedPane tabbedPane = new JTabbedPane();
         for (int i = 0; i < tabLabels.length; i++) {
-            tabbedPane.addTab(tabLabels[i], pageContent(tabLabels[i], descriptions[i], tabPanels[i]));
+            tabbedPane.addTab(tabLabels[i], tabPage(descriptions[i], tabPanels[i]));
         }
 
         JPanel wrapper = new JPanel(new BorderLayout());
         wrapper.setBackground(UITheme.BG_DARK);
+        wrapper.setBorder(BorderFactory.createEmptyBorder(0, 20, 0, 20));
         wrapper.add(tabbedPane, BorderLayout.CENTER);
         return wrapper;
     }
 
-    private JPanel pageContent(String title, String description, JPanel body) {
-        JPanel page = new JPanel(new BorderLayout(0, 10));
+    /** One tab: a short description line, then the panel. */
+    private JPanel tabPage(String description, JPanel body) {
+        JPanel page = new JPanel(new BorderLayout(0, 6));
         page.setBackground(UITheme.BG_DARK);
-
-        JPanel heading = new JPanel();
-        heading.setLayout(new BoxLayout(heading, BoxLayout.Y_AXIS));
-        heading.setBackground(UITheme.BG_DARK);
-        heading.setBorder(BorderFactory.createEmptyBorder(18, 20, 8, 20));
-
-        JLabel titleLabel = new JLabel(title);
-        titleLabel.setForeground(UITheme.TEXT_LIGHT);
-        titleLabel.setFont(UITheme.FONT_TITLE.deriveFont(26f));
-        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        JLabel descriptionLabel = new JLabel("<html><div style='width:900px'>" + description + "</div></html>");
+        JLabel descriptionLabel = new JLabel("<html><div style='width:760px'>" + description + "</div></html>");
         descriptionLabel.setForeground(UITheme.TEXT_MUTED);
-        descriptionLabel.setFont(UITheme.FONT_BODY.deriveFont(15f));
-        descriptionLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        heading.add(titleLabel);
-        heading.add(Box.createVerticalStrut(4));
-        heading.add(descriptionLabel);
-
-        page.add(heading, BorderLayout.NORTH);
+        descriptionLabel.setFont(UITheme.font(Font.PLAIN, 13));
+        descriptionLabel.setBorder(BorderFactory.createEmptyBorder(12, 4, 2, 4));
+        page.add(descriptionLabel, BorderLayout.NORTH);
         page.add(body, BorderLayout.CENTER);
         return page;
     }
 
+    /** A screen: big title + description on the left, signed-in user and today's date on the right, then the panel. */
+    private JPanel pageContent(String title, String description, JPanel body) {
+        JPanel page = new JPanel(new BorderLayout(0, 6));
+        page.setBackground(UITheme.BG_DARK);
+
+        JPanel heading = new JPanel();
+        heading.setLayout(new BoxLayout(heading, BoxLayout.Y_AXIS));
+        heading.setOpaque(false);
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setForeground(UITheme.TEXT_LIGHT);
+        titleLabel.setFont(UITheme.font(Font.BOLD, 24));
+        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JLabel descriptionLabel = new JLabel("<html><div style='width:640px'>" + description + "</div></html>");
+        descriptionLabel.setForeground(UITheme.TEXT_MUTED);
+        descriptionLabel.setFont(UITheme.font(Font.PLAIN, 13));
+        descriptionLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        heading.add(titleLabel);
+        heading.add(Box.createVerticalStrut(2));
+        heading.add(descriptionLabel);
+
+        JPanel top = new JPanel(new BorderLayout());
+        top.setOpaque(false);
+        top.setBorder(BorderFactory.createEmptyBorder(18, 24, 12, 24));
+        top.add(heading, BorderLayout.CENTER);
+        top.add(userChip(), BorderLayout.EAST);
+
+        page.add(top, BorderLayout.NORTH);
+        page.add(body, BorderLayout.CENTER);
+        return page;
+    }
+
+    private JComponent userChip() {
+        String first = staff.getFirstName() == null ? "" : staff.getFirstName();
+        String last = staff.getLastName() == null ? "" : staff.getLastName();
+        String initials = ((first.isEmpty() ? "" : first.substring(0, 1)) + (last.isEmpty() ? "" : last.substring(0, 1))).toUpperCase();
+        if (initials.isEmpty()) initials = "?";
+        final String ini = initials;
+        JComponent avatar = new JComponent() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                g2.setColor(UITheme.NAVY);
+                g2.fillOval(0, 0, 40, 40);
+                g2.setColor(Color.WHITE);
+                g2.setFont(UITheme.font(Font.BOLD, 14));
+                FontMetrics fm = g2.getFontMetrics();
+                g2.drawString(ini, (40 - fm.stringWidth(ini)) / 2, (40 + fm.getAscent() - fm.getDescent()) / 2);
+                g2.dispose();
+            }
+        };
+        avatar.setPreferredSize(new Dimension(40, 40));
+
+        String role = staff.getRole() == null ? "" : staff.getRole();
+        role = role.isEmpty() ? "" : Character.toUpperCase(role.charAt(0)) + role.substring(1);
+        JLabel name = new JLabel((first + " " + last).trim());
+        name.setFont(UITheme.font(Font.BOLD, 13));
+        name.setForeground(UITheme.TEXT_LIGHT);
+        JLabel sub = new JLabel(role + "  \u00B7  " + LocalDate.now().format(DateTimeFormatter.ofPattern("EEE, MMM d")));
+        sub.setFont(UITheme.font(Font.PLAIN, 12));
+        sub.setForeground(UITheme.TEXT_MUTED);
+        JPanel text = new JPanel();
+        text.setOpaque(false);
+        text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
+        text.add(Box.createVerticalGlue());
+        text.add(name);
+        text.add(sub);
+        text.add(Box.createVerticalGlue());
+
+        JPanel chip = new JPanel(new BorderLayout(10, 0)) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(Color.WHITE);
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 28, 28);
+                g2.setColor(UITheme.BORDER);
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 28, 28);
+                g2.dispose();
+            }
+        };
+        chip.setOpaque(false);
+        chip.setBorder(BorderFactory.createEmptyBorder(5, 6, 5, 18));
+        chip.add(avatar, BorderLayout.WEST);
+        chip.add(text, BorderLayout.CENTER);
+        JPanel holder = new JPanel(new GridBagLayout());
+        holder.setOpaque(false);
+        holder.add(chip);
+        return holder;
+    }
+
+    // ------------------------------------------------------------------ sidebar
+
+    private JComponent brand() {
+        JPanel p = new JPanel(new BorderLayout(10, 0));
+        p.setOpaque(false);
+        p.setAlignmentX(Component.LEFT_ALIGNMENT);
+        p.setBorder(BorderFactory.createEmptyBorder(12, 6, 6, 0));
+        JComponent logo = new JComponent() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(UITheme.RED_ACCENT);
+                g2.fillOval(0, 0, 34, 34);
+                g2.setColor(Color.WHITE);
+                g2.fillOval(9, 9, 16, 16);
+                g2.setColor(UITheme.RED_ACCENT);
+                g2.fillOval(13, 13, 8, 8);
+                g2.dispose();
+            }
+        };
+        logo.setPreferredSize(new Dimension(34, 34));
+        JLabel name = new JLabel("Restro Rentals");
+        name.setFont(UITheme.font(Font.BOLD, 20));
+        name.setForeground(UITheme.NAVY);
+        JLabel sub = new JLabel("Vehicle rental system");
+        sub.setFont(UITheme.font(Font.PLAIN, 11));
+        sub.setForeground(UITheme.TEXT_MUTED);
+        JPanel text = new JPanel();
+        text.setOpaque(false);
+        text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
+        text.add(name);
+        text.add(sub);
+        p.add(logo, BorderLayout.WEST);
+        p.add(text, BorderLayout.CENTER);
+        p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
+        return p;
+    }
+
+    private void section(JPanel sidebar, String text) {
+        JLabel l = new JLabel(text);
+        l.setFont(UITheme.font(Font.BOLD, 11));
+        l.setForeground(new Color(160, 170, 186));
+        l.setAlignmentX(Component.LEFT_ALIGNMENT);
+        l.setBorder(BorderFactory.createEmptyBorder(12, 10, 4, 0));
+        sidebar.add(l);
+    }
+
     private void addModule(JPanel sidebar, String label, String description, JPanel panel) {
         content.add(pageContent(label, description, panel), label);
-        JButton btn = UITheme.sidebarButton(label);
+        NavButton btn = new NavButton(label, ICONS.getOrDefault(label, "dashboard"));
         btn.setToolTipText(description);
         btn.setName(label);
+        navButtons.put(label, btn);
         btn.addActionListener(e -> {
             cards.show(content, label);
             updateSelectedSidebarButton(btn);
@@ -191,38 +350,68 @@ public class MainFrame extends JFrame {
         });
         modulesMenu.add(item);
         sidebar.add(btn);
-        sidebar.add(Box.createVerticalStrut(4));
+        sidebar.add(Box.createVerticalStrut(2));
     }
 
-    private void updateSelectedSidebarButton(JButton newSelectedButton) {
-        if (selectedSidebarButton != null && selectedSidebarButton != newSelectedButton) {
-            selectedSidebarButton.setBackground(UITheme.BG_PANEL);
-            selectedSidebarButton.setOpaque(false);
-            selectedSidebarButton.setBorder(new EmptyBorder(6, 12, 6, 12));
-        }
+    private void showModule(String label) {
+        cards.show(content, label);
+        updateSelectedSidebarButton(label);
+    }
 
+    private void updateSelectedSidebarButton(NavButton newSelectedButton) {
+        if (selectedSidebarButton != null && selectedSidebarButton != newSelectedButton) {
+            selectedSidebarButton.setSelectedItem(false);
+        }
         selectedSidebarButton = newSelectedButton;
-        selectedSidebarButton.setBackground(new Color(8, 45, 110));
-        selectedSidebarButton.setOpaque(true);
-        selectedSidebarButton.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(150, 190, 255), 1),
-            BorderFactory.createEmptyBorder(6, 12, 6, 12)
-        ));
-        selectedSidebarButton.repaint();
+        selectedSidebarButton.setSelectedItem(true);
     }
 
     private void updateSelectedSidebarButton(String selectedLabel) {
-        for (Component comp : ((Container) getContentPane().getComponent(0)).getComponents()) {
-            if (comp instanceof JScrollPane) {
-                JScrollPane scroll = (JScrollPane) comp;
-                Container view = (Container) scroll.getViewport().getView();
-                for (Component child : view.getComponents()) {
-                    if (child instanceof JButton && selectedLabel.equals(child.getName())) {
-                        updateSelectedSidebarButton((JButton) child);
-                        return;
-                    }
-                }
-            }
+        NavButton b = navButtons.get(selectedLabel);
+        if (b != null) updateSelectedSidebarButton(b);
+    }
+
+    /** One sidebar entry: line icon + label; the selected one gets the soft-blue pill. */
+    private static final class NavButton extends JButton {
+        private final String icon;
+        private boolean selected, danger;
+
+        NavButton(String text, String icon) {
+            super(text);
+            this.icon = icon;
+            setFont(UITheme.font(Font.PLAIN, 14));
+            setHorizontalAlignment(SwingConstants.LEFT);
+            setBorder(BorderFactory.createEmptyBorder(0, 46, 0, 8));
+            setContentAreaFilled(false);
+            setFocusPainted(false);
+            setOpaque(false);
+            setAlignmentX(Component.LEFT_ALIGNMENT);
+            setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+            setPreferredSize(new Dimension(100, 40));
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            setRolloverEnabled(true);
+            putClientProperty("ui.flat", Boolean.TRUE);
+        }
+
+        void setSelectedItem(boolean s) { selected = s; repaint(); }
+        void setDanger(boolean d) { danger = d; repaint(); }
+
+        @Override protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            int w = getWidth(), h = getHeight();
+            boolean hover = getModel().isRollover();
+            if (selected) { g2.setColor(UITheme.TINT); g2.fillRoundRect(0, 0, w, h, 14, 14); }
+            else if (hover) { g2.setColor(new Color(244, 247, 251)); g2.fillRoundRect(0, 0, w, h, 14, 14); }
+            if (selected) { g2.setColor(UITheme.RED_ACCENT); g2.fillRoundRect(0, 9, 4, h - 18, 4, 4); }
+            Color c = danger ? UITheme.RED_ACCENT : selected ? UITheme.RED_ACCENT : UITheme.TEXT_MUTED;
+            Icons.paint(icon, g2, 14, (h - 20) / 2f, 20, c);
+            g2.setFont(selected ? getFont().deriveFont(Font.BOLD) : getFont());
+            g2.setColor(danger ? UITheme.RED_ACCENT : selected ? UITheme.TEXT_LIGHT : new Color(70, 84, 106));
+            FontMetrics fm = g2.getFontMetrics();
+            g2.drawString(getText(), 46, (h + fm.getAscent() - fm.getDescent()) / 2);
+            g2.dispose();
         }
     }
 }

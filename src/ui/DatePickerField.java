@@ -31,7 +31,7 @@ public final class DatePickerField extends JPanel {
             new EmptyBorder(4, 8, 4, 6)
         ));
 
-        dateLabel.setForeground(UITheme.BG_DARK);
+        dateLabel.setForeground(UITheme.TEXT_LIGHT);
         dateLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         dateLabel.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override public void mouseClicked(java.awt.event.MouseEvent e) { openCalendar(); }
@@ -82,7 +82,7 @@ public final class DatePickerField extends JPanel {
         @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(UITheme.BG_DARK);
+            g.setColor(UITheme.NAVY);
             g.drawRoundRect(x + 1, y + 3, 13, 11, 2, 2);
             g.fillRect(x + 1, y + 5, 14, 3);
             g.drawLine(x + 4, y + 1, x + 4, y + 5);
@@ -180,7 +180,7 @@ public final class DatePickerField extends JPanel {
                 button.setFocusPainted(false);
                 button.setOpaque(true);
                 button.setBackground(candidate.equals(selectedDate) ? selectedColor : Color.WHITE);
-                button.setForeground(candidate.equals(selectedDate) ? Color.WHITE : UITheme.BG_DARK);
+                button.setForeground(candidate.equals(selectedDate) ? Color.WHITE : UITheme.TEXT_LIGHT);
                 button.setBorder(BorderFactory.createLineBorder(
                     candidate.equals(LocalDate.now()) ? UITheme.RED_ACCENT : new Color(205, 215, 230)));
                 button.addActionListener(e -> chooseDate(candidate));
