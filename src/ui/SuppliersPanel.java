@@ -43,7 +43,7 @@ public class SuppliersPanel extends JPanel {
 
         add(buildForm(), BorderLayout.NORTH);
         FormSupport.onDoubleClick(table, this::onRowSelected);   // MouseListener: double-click a row to load it into the form
-        add(SearchBar.wrap(table, this::runSearch), BorderLayout.CENTER);
+        add(SearchBar.wrap(table, this::runSearch, this::refreshTable), BorderLayout.CENTER);
 
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) onRowSelected();
@@ -71,8 +71,6 @@ public class SuppliersPanel extends JPanel {
         JButton btnUpdate = UITheme.primaryButton("Update");
         JButton btnDelete = UITheme.primaryButton("Delete");
         JButton btnClear = UITheme.primaryButton("Clear");
-        JButton btnRefresh = UITheme.primaryButton("Refresh");
-        btnRefresh.addActionListener(e -> ErrorHandler.run(this, () -> refreshTable()));
         btnAdd.addActionListener(e -> ErrorHandler.run(this, this::addSupplier));
         btnUpdate.addActionListener(e -> ErrorHandler.run(this, this::updateSupplier));
         btnDelete.addActionListener(e -> ErrorHandler.run(this, this::deleteSupplier));
@@ -84,7 +82,6 @@ public class SuppliersPanel extends JPanel {
         buttons.add(btnUpdate);
         buttons.add(btnDelete);
         buttons.add(btnClear);
-        buttons.add(btnRefresh);
         gc.gridx = 0; gc.gridy = row; gc.gridwidth = 2;
         form.add(buttons, gc);
         return form;

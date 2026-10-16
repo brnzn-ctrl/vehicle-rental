@@ -31,7 +31,7 @@ public class ExpensesPanel extends JPanel {
     private final JTextField txtCategory = new JTextField(15);
     private final JTextField txtDescription = new JTextField(20);
     private final JTextField txtAmount = new JTextField(10);
-    private final JTextField txtDate = new JTextField(10);
+    private final DatePickerField txtDate = new DatePickerField(LocalDate.now());
 
     private Expense selected;
 
@@ -43,14 +43,16 @@ public class ExpensesPanel extends JPanel {
 
         add(buildForm(), BorderLayout.NORTH);
         FormSupport.onDoubleClick(table, this::onRowSelected);   // MouseListener: double-click a row to load it into the form
-        add(SearchBar.wrap(table, this::runSearch), BorderLayout.CENTER);
+        add(SearchBar.wrap(table, this::runSearch, this::refreshTable), BorderLayout.CENTER);
 
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) onRowSelected();
         });
 
-        txtDate.setText(LocalDate.now().toString());
         refreshTable();
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentShown(java.awt.event.ComponentEvent e) { refreshTable(); }
+        });
     }
 
     private JPanel buildForm() {
@@ -65,14 +67,12 @@ public class ExpensesPanel extends JPanel {
         addField(form, gc, row++, "Category:", txtCategory);
         addField(form, gc, row++, "Description:", txtDescription);
         addField(form, gc, row++, "Amount:", txtAmount);
-        addField(form, gc, row++, "Date (YYYY-MM-DD):", txtDate);
+        addField(form, gc, row++, "Date:", txtDate);
 
         JButton btnAdd = UITheme.primaryButton("Save");
         JButton btnUpdate = UITheme.primaryButton("Update");
         JButton btnDelete = UITheme.primaryButton("Delete");
         JButton btnClear = UITheme.primaryButton("Clear");
-        JButton btnRefresh = UITheme.primaryButton("Refresh");
-        btnRefresh.addActionListener(e -> ErrorHandler.run(this, () -> refreshTable()));
         btnAdd.addActionListener(e -> ErrorHandler.run(this, this::addExpense));
         btnUpdate.addActionListener(e -> ErrorHandler.run(this, this::updateExpense));
         btnDelete.addActionListener(e -> ErrorHandler.run(this, this::deleteExpense));
@@ -84,7 +84,6 @@ public class ExpensesPanel extends JPanel {
         buttons.add(btnUpdate);
         buttons.add(btnDelete);
         buttons.add(btnClear);
-        buttons.add(btnRefresh);
         gc.gridx = 0; gc.gridy = row; gc.gridwidth = 2;
         form.add(buttons, gc);
 
@@ -132,7 +131,7 @@ public class ExpensesPanel extends JPanel {
         txtCategory.setText(selected.getCategory());
         txtDescription.setText(selected.getDescription());
         txtAmount.setText(selected.getAmount().toString());
-        txtDate.setText(selected.getExpenseDate().toString());
+        txtDate.setDate(selected.getExpenseDate());
     }
 
     private void addExpense() {
@@ -176,9 +175,9 @@ public class ExpensesPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Amount must be a number greater than 0, e.g. 500.00");
             return null;
         }
-        LocalDate date = Validator.parseDate(txtDate.getText());
+        LocalDate date = txtDate.getDate();
         if (date == null) {
-            JOptionPane.showMessageDialog(this, "Date must be a valid date in YYYY-MM-DD format.");
+            JOptionPane.showMessageDialog(this, "Choose an expense date.");
             return null;
         }
         if (date.isAfter(LocalDate.now())) {
@@ -198,7 +197,7 @@ public class ExpensesPanel extends JPanel {
         txtCategory.setText("");
         txtDescription.setText("");
         txtAmount.setText("");
-        txtDate.setText(LocalDate.now().toString());
+        txtDate.setDate(LocalDate.now());
         table.clearSelection();
     }
 }

@@ -1,25 +1,29 @@
 package dao;
 
 import database.DatabaseConnection;
+import database.StockLevelUpdater;
 import model.Supply;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.Types;
 
 public class SupplyDAO extends AbstractDAO<Supply> {
 
     private static final String BASE_SELECT =
-        "SELECT s.supply_id, s.supply_name, s.unit, s.supplier_id, sup.supplier_name, s.reorder_level " +
+        "SELECT s.supply_id, s.supply_name, s.unit, s.supplier_id, sup.supplier_name, s.reorder_threshold, s.stock_level " +
         "FROM supplies s LEFT JOIN suppliers sup ON s.supplier_id = sup.supplier_id";
 
     @Override protected String selectAllSql()  { return BASE_SELECT + " ORDER BY s.supply_name"; }
-    @Override protected String[] searchColumns() { return new String[]{ "s.supply_id", "s.supply_name", "s.unit", "sup.supplier_name", "s.reorder_level" }; }
+    @Override protected String[] searchColumns() { return new String[]{ "s.supply_id", "s.supply_name", "s.unit", "sup.supplier_name", "s.reorder_threshold", "s.stock_level" }; }
     @Override protected String selectByIdSql() { return BASE_SELECT + " WHERE s.supply_id=?"; }
     @Override protected String deleteSql()     { return "DELETE FROM supplies WHERE supply_id=?"; }
 
     @Override protected String insertSql() {
-        return "INSERT INTO supplies(supply_name, unit, supplier_id, reorder_level) VALUES (?,?,?,?)";
+        return "INSERT INTO supplies(supply_name, unit, supplier_id, reorder_threshold) VALUES (?,?,?,?)";
     }
     @Override protected String updateSql() {
-        return "UPDATE supplies SET supply_name=?, unit=?, supplier_id=?, reorder_level=? WHERE supply_id=?";
+        return "UPDATE supplies SET supply_name=?, unit=?, supplier_id=?, reorder_threshold=? WHERE supply_id=?";
     }
 
     @Override protected RowMapper<Supply> mapper() {
@@ -31,9 +35,26 @@ public class SupplyDAO extends AbstractDAO<Supply> {
             int supId = rs.getInt("supplier_id");
             s.setSupplierId(rs.wasNull() ? null : supId);
             s.setSupplierName(rs.getString("supplier_name"));
-            s.setReorderLevel(rs.getInt("reorder_level"));
+            s.setReorderThreshold(rs.getInt("reorder_threshold"));
+            s.setStockLevel(rs.getString("stock_level"));
             return s;
         };
+    }
+
+    @Override public void update(Supply supply) {
+        try (Connection c = DatabaseConnection.getConnection()) {
+            c.setAutoCommit(false);
+            try (PreparedStatement ps = c.prepareStatement(updateSql())) {
+                updateBinder().bind(ps, supply);
+                if (ps.executeUpdate() == 0) {
+                    throw new SQLException("That record no longer exists. Refresh the list and try again.", "VR404");
+                }
+            }
+            StockLevelUpdater.refresh(c, supply.getId());
+            c.commit();
+        } catch (SQLException e) {
+            throw new RuntimeException("update failed: " + e.getMessage(), e);
+        }
     }
 
     @Override protected ParamBinder<Supply> insertBinder() {
@@ -41,7 +62,7 @@ public class SupplyDAO extends AbstractDAO<Supply> {
             ps.setString(1, s.getName());
             ps.setString(2, s.getUnit());
             if (s.getSupplierId() != null) ps.setInt(3, s.getSupplierId()); else ps.setNull(3, Types.INTEGER);
-            ps.setInt(4, s.getReorderLevel());
+            ps.setInt(4, s.getReorderThreshold());
         };
     }
 
@@ -50,7 +71,7 @@ public class SupplyDAO extends AbstractDAO<Supply> {
             ps.setString(1, s.getName());
             ps.setString(2, s.getUnit());
             if (s.getSupplierId() != null) ps.setInt(3, s.getSupplierId()); else ps.setNull(3, Types.INTEGER);
-            ps.setInt(4, s.getReorderLevel());
+            ps.setInt(4, s.getReorderThreshold());
             ps.setInt(5, s.getId());
         };
     }

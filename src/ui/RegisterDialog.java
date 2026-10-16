@@ -23,7 +23,7 @@ public class RegisterDialog extends JDialog {
     private final JTextField txtLastName = new BoxField("Last name");
     private final JTextField txtEmail = new BoxField("name@example.com");
     private final JTextField txtPhone = new BoxField("11-digit mobile number");
-    private final JTextField txtLicense = new BoxField("License number");
+    private final JTextField txtLicense = new BoxField("ex. D01-23-456789");
 
     public RegisterDialog(Frame owner, CustomerDAO customerDAO) {
         super(owner, "Create Customer Account", true);
@@ -112,7 +112,7 @@ public class RegisterDialog extends JDialog {
         addTwoFields(card, gc, r++, "First Name", txtFirstName, "Last Name", txtLastName);
         addField(card, gc, r++, "Email", txtEmail);
         addField(card, gc, r++, "Phone (11 digits)", txtPhone);
-        addField(card, gc, r++, "Driver's License No.", txtLicense);
+        addField(card, gc, r++, "Driver's License No. (required)", txtLicense);
         root.add(card, BorderLayout.CENTER);
 
         // ---- Buttons ----
@@ -238,8 +238,8 @@ public class RegisterDialog extends JDialog {
         String phone = txtPhone.getText().trim();
         String license = txtLicense.getText().trim();
 
-        if (username.isEmpty() || password.isEmpty() || firstName.isEmpty() || lastName.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Username, password, first and last name are required.");
+        if (username.isEmpty() || password.isEmpty() || firstName.isEmpty() || lastName.isEmpty() || license.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Username, password, first and last name, and driver's license number are required.");
             return;
         }
         if (!password.equals(confirm)) {
@@ -276,7 +276,7 @@ public class RegisterDialog extends JDialog {
         c.setLastName(lastName);
         c.setEmail(email.isEmpty() ? null : email);
         c.setPhone(phone.isEmpty() ? null : phone);
-        c.setLicenseNumber(license.isEmpty() ? null : license);
+        c.setLicenseNumber(license);
         c.setActive(true);
 
         try {

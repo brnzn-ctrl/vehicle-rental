@@ -21,9 +21,8 @@ public class DashboardDAO {
         m.put("Today's Payments (PHP)", one("SELECT COALESCE(SUM(amount),0) FROM payments WHERE DATE(payment_date) = CURRENT_DATE"));
         m.put("Total Income (PHP)", String.valueOf(new PaymentDAO().totalIncome()));
         m.put("Total Expenses (PHP)", one("SELECT COALESCE(SUM(amount),0) FROM expenses"));
-        m.put("Low-Stock Supplies", one(
-            "SELECT COUNT(*) FROM supplies s WHERE " +
-            "COALESCE((SELECT SUM(i.quantity) FROM inventory_stock i WHERE i.supply_id = s.supply_id),0) <= s.reorder_level"));
+        m.put("Low-Stock Supplies", one("SELECT COUNT(*) FROM supplies WHERE stock_level = ?", "low stock"));
+        m.put("Critical-Stock Supplies", one("SELECT COUNT(*) FROM supplies WHERE stock_level = ?", "critical stock"));
         return m;
     }
 

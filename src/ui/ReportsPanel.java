@@ -2,7 +2,6 @@ package ui;
 
 import dao.ReportDAO;
 import util.ErrorHandler;
-import util.Validator;
 import javax.swing.*;
 import java.awt.*;
 import java.math.BigDecimal;
@@ -15,8 +14,8 @@ public class ReportsPanel extends JPanel {
     private final BarChartPanel chart = new BarChartPanel();
 
     // default range = the current year, so the screen is still correct next year
-    private final JTextField txtFrom = new JTextField(LocalDate.now().withDayOfYear(1).toString(), 10);
-    private final JTextField txtTo   = new JTextField(LocalDate.now().withMonth(12).withDayOfMonth(31).toString(), 10);
+    private final DatePickerField txtFrom = new DatePickerField(LocalDate.now().withDayOfYear(1));
+    private final DatePickerField txtTo   = new DatePickerField(LocalDate.now().withMonth(12).withDayOfMonth(31));
     private final JLabel lblTotal = new JLabel("Total Income: —");
 
     public ReportsPanel() {
@@ -34,7 +33,7 @@ public class ReportsPanel extends JPanel {
         add(chart, BorderLayout.CENTER);
 
         JPanel dateRangePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        dateRangePanel.add(new JLabel("From (YYYY-MM-DD):"));
+        dateRangePanel.add(new JLabel("From:"));
         dateRangePanel.add(txtFrom);
         dateRangePanel.add(new JLabel("To:"));
         dateRangePanel.add(txtTo);
@@ -50,10 +49,10 @@ public class ReportsPanel extends JPanel {
     }
 
     private void computeIncome() {
-        LocalDate from = Validator.parseDate(txtFrom.getText());
-        LocalDate to = Validator.parseDate(txtTo.getText());
+        LocalDate from = txtFrom.getDate();
+        LocalDate to = txtTo.getDate();
         if (from == null || to == null) {
-            JOptionPane.showMessageDialog(this, "Enter valid dates in YYYY-MM-DD format, e.g. " + LocalDate.now().withDayOfYear(1));
+            JOptionPane.showMessageDialog(this, "Choose both a start date and an end date.");
             return;
         }
         if (from.isAfter(to)) {

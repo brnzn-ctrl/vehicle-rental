@@ -28,6 +28,7 @@ public class LoginForm extends JFrame {
     private final CustomerDAO customerDAO = new CustomerDAO();
 
     public LoginForm() {
+        roleBox.setSelectedItem("Customer");
         setTitle("Restro Rentals — Login");
         setSize(420, 400);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -84,7 +85,7 @@ public class LoginForm extends JFrame {
         clearButton.addActionListener(e -> {
             usernameField.setText("");
             passwordField.setText("");
-            roleBox.setSelectedIndex(0);
+            roleBox.setSelectedItem("Customer");
             usernameField.requestFocus();
         });
         exitButton.addActionListener(e -> {

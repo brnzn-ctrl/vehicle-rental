@@ -1,7 +1,12 @@
 package dao;
 
-
+import database.DatabaseConnection;
+import database.StockLevelUpdater;
 import model.InventoryStock;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class InventoryStockDAO extends AbstractDAO<InventoryStock> {
 
@@ -50,5 +55,61 @@ public class InventoryStockDAO extends AbstractDAO<InventoryStock> {
             ps.setBigDecimal(3, i.getUnitCost());
             ps.setInt(4, i.getId());
         };
+    }
+
+    @Override public void insert(InventoryStock stock) {
+        try (Connection c = DatabaseConnection.getConnection()) {
+            c.setAutoCommit(false);
+            super.insert(c, stock);
+            StockLevelUpdater.refresh(c, stock.getSupplyId());
+            c.commit();
+        } catch (SQLException e) {
+            throw new RuntimeException("insert failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override public void update(InventoryStock stock) {
+        try (Connection c = DatabaseConnection.getConnection()) {
+            c.setAutoCommit(false);
+            int oldSupplyId;
+            try (PreparedStatement find = c.prepareStatement("SELECT supply_id FROM inventory_stock WHERE stock_id=?")) {
+                find.setInt(1, stock.getId());
+                try (ResultSet rs = find.executeQuery()) {
+                    if (!rs.next()) throw new SQLException("That record no longer exists. Refresh the list and try again.", "VR404");
+                    oldSupplyId = rs.getInt(1);
+                }
+            }
+            try (PreparedStatement ps = c.prepareStatement(updateSql())) {
+                updateBinder().bind(ps, stock);
+                if (ps.executeUpdate() == 0) throw new SQLException("That record no longer exists. Refresh the list and try again.", "VR404");
+            }
+            StockLevelUpdater.refresh(c, oldSupplyId);
+            if (oldSupplyId != stock.getSupplyId()) StockLevelUpdater.refresh(c, stock.getSupplyId());
+            c.commit();
+        } catch (SQLException e) {
+            throw new RuntimeException("update failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override public void delete(int id) {
+        try (Connection c = DatabaseConnection.getConnection()) {
+            c.setAutoCommit(false);
+            int supplyId;
+            try (PreparedStatement find = c.prepareStatement("SELECT supply_id FROM inventory_stock WHERE stock_id=?")) {
+                find.setInt(1, id);
+                try (ResultSet rs = find.executeQuery()) {
+                    if (!rs.next()) throw new SQLException("That record no longer exists. Refresh the list and try again.", "VR404");
+                    supplyId = rs.getInt(1);
+                }
+            }
+            try (PreparedStatement ps = c.prepareStatement(deleteSql())) {
+                ps.setInt(1, id);
+                if (ps.executeUpdate() == 0) throw new SQLException("That record no longer exists. Refresh the list and try again.", "VR404");
+            }
+            StockLevelUpdater.refresh(c, supplyId);
+            c.commit();
+        } catch (SQLException e) {
+            throw new RuntimeException("delete failed: " + e.getMessage(), e);
+        }
     }
 }

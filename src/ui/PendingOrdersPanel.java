@@ -23,14 +23,12 @@ public class PendingOrdersPanel extends JPanel {
     public PendingOrdersPanel() {
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        add(SearchBar.wrap(table, this::runSearch), BorderLayout.CENTER);
+        add(SearchBar.wrap(table, this::runSearch, this::refresh), BorderLayout.CENTER);
 
         JButton btnApprove = new JButton("Approve");
         JButton btnReject = new JButton("Reject");
-        JButton btnRefresh = new JButton("Refresh");
         btnApprove.addActionListener(e -> ErrorHandler.run(this, () -> updateStatus("approved")));
         btnReject.addActionListener(e -> ErrorHandler.run(this, () -> updateStatus("rejected")));
-        btnRefresh.addActionListener(e -> refresh());
 
         table.getSelectionModel().addListSelectionListener(e -> {
             if (e.getValueIsAdjusting()) return;
@@ -45,7 +43,6 @@ public class PendingOrdersPanel extends JPanel {
         top.add(txtId);
         top.add(btnApprove);
         top.add(btnReject);
-        top.add(btnRefresh);
         add(top, BorderLayout.NORTH);
 
         refresh();

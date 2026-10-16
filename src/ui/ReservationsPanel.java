@@ -12,7 +12,6 @@ import model.Vehicle;
 import util.AccessControl;
 import util.ErrorHandler;
 import util.UITheme;
-import util.Validator;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -33,7 +32,7 @@ public class ReservationsPanel extends JPanel {
     private final DiscountEventDAO discountDAO = new DiscountEventDAO();
     private final Staff loggedInStaff;
 
-    private static final String[] STATUSES = {"pending", "approved", "rejected", "cancelled", "converted"};
+    private static final String[] STATUSES = {"pending", "approved", "rejected", "cancelled", "rented"};
 
     private final DefaultTableModel tableModel =
         new DefaultTableModel(new Object[]{"ID", "Customer", "Vehicle", "Start", "End", "Status", "Discount"}, 0) {
@@ -51,8 +50,8 @@ public class ReservationsPanel extends JPanel {
 
     private final JComboBox<Customer> cboCustomer = new JComboBox<>();
     private final JComboBox<Vehicle> cboVehicle = new JComboBox<>();
-    private final JTextField txtStart = new JTextField(10);
-    private final JTextField txtEnd = new JTextField(10);
+    private final DatePickerField txtStart = new DatePickerField(LocalDate.now());
+    private final DatePickerField txtEnd = new DatePickerField(LocalDate.now().plusDays(1));
     private final JComboBox<DiscountItem> cboDiscount = new JComboBox<>();
     private final JComboBox<String> cboStatus = new JComboBox<>(STATUSES);
 
@@ -67,7 +66,7 @@ public class ReservationsPanel extends JPanel {
         setBackground(UITheme.BG_DARK);
 
         add(buildForm(), BorderLayout.NORTH);
-        add(SearchBar.wrap(table, this::runSearch), BorderLayout.CENTER);
+        add(SearchBar.wrap(table, this::runSearch, this::refreshData), BorderLayout.CENTER);
 
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) onRowSelected();
@@ -92,8 +91,8 @@ public class ReservationsPanel extends JPanel {
         addField(form, gc, row++, "Reservation ID:", txtId);
         addField(form, gc, row++, "Customer:", cboCustomer);
         addField(form, gc, row++, "Vehicle:", cboVehicle);
-        addField(form, gc, row++, "Start Date (YYYY-MM-DD):", txtStart);
-        addField(form, gc, row++, "End Date (YYYY-MM-DD):", txtEnd);
+        addField(form, gc, row++, "Start Date:", txtStart);
+        addField(form, gc, row++, "End Date:", txtEnd);
         addField(form, gc, row++, "Discount event:", cboDiscount);
         addField(form, gc, row++, "Status:", cboStatus);
 
@@ -101,12 +100,10 @@ public class ReservationsPanel extends JPanel {
         JButton btnUpdate = UITheme.primaryButton("Update");
         JButton btnDelete = UITheme.primaryButton("Delete");
         JButton btnClear = UITheme.primaryButton("Clear");
-        JButton btnRefresh = UITheme.primaryButton("Refresh");
         btnSave.addActionListener(e -> ErrorHandler.run(this, this::addReservation));
         btnUpdate.addActionListener(e -> ErrorHandler.run(this, this::updateReservation));
         btnDelete.addActionListener(e -> ErrorHandler.run(this, this::deleteReservation));
         btnClear.addActionListener(e -> clearForm());
-        btnRefresh.addActionListener(e -> { loadCombos(); refreshTable(); });
 
         JPanel buttons = new JPanel();
         buttons.setBackground(UITheme.BG_DARK);
@@ -114,7 +111,6 @@ public class ReservationsPanel extends JPanel {
         buttons.add(btnUpdate);
         buttons.add(btnDelete);
         buttons.add(btnClear);
-        buttons.add(btnRefresh);
         gc.gridx = 0; gc.gridy = row; gc.gridwidth = 2;
         form.add(buttons, gc);
         return form;
@@ -156,6 +152,11 @@ public class ReservationsPanel extends JPanel {
         refreshTable();
     }
 
+    private void refreshData() {
+        loadCombos();
+        refreshTable();
+    }
+
     private void refreshTable() {
         tableModel.setRowCount(0);
         for (Reservation r : reservationDAO.search(keyword)) {
@@ -180,8 +181,8 @@ public class ReservationsPanel extends JPanel {
         FormSupport.showId(txtId, selected.getId());
         selectOrAddCustomer(selected.getCustomerId());
         selectOrAddVehicle(selected.getVehicleId());
-        txtStart.setText(selected.getStartDate().toString());
-        txtEnd.setText(selected.getEndDate().toString());
+        txtStart.setDate(selected.getStartDate());
+        txtEnd.setDate(selected.getEndDate());
         cboStatus.setSelectedItem(selected.getStatus());
         cboDiscount.setSelectedIndex(0);
         for (int i = 0; i < cboDiscount.getItemCount(); i++) {
@@ -212,10 +213,10 @@ public class ReservationsPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Select a customer and a vehicle.");
             return false;
         }
-        LocalDate start = Validator.parseDate(txtStart.getText());
-        LocalDate end = Validator.parseDate(txtEnd.getText());
+        LocalDate start = txtStart.getDate();
+        LocalDate end = txtEnd.getDate();
         if (start == null || end == null) {
-            JOptionPane.showMessageDialog(this, "Start and end dates must be valid dates in YYYY-MM-DD format.");
+            JOptionPane.showMessageDialog(this, "Choose both a start date and an end date.");
             return false;
         }
         if (end.isBefore(start)) {
@@ -226,8 +227,8 @@ public class ReservationsPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "The start date cannot be in the past.");
             return false;
         }
-        if ("converted".equals(cboStatus.getSelectedItem()) && (adding || selected == null || !"converted".equals(selected.getStatus()))) {
-            JOptionPane.showMessageDialog(this, "\"converted\" is set automatically when a rental is created from the reservation.");
+        if ("rented".equals(cboStatus.getSelectedItem()) && (adding || selected == null || !"rented".equals(selected.getStatus()))) {
+            JOptionPane.showMessageDialog(this, "\"rented\" is set automatically when a rental is created from the reservation.");
             return false;
         }
         return true;
@@ -238,8 +239,8 @@ public class ReservationsPanel extends JPanel {
         Vehicle veh = (Vehicle) cboVehicle.getSelectedItem();
         r.setCustomerId(cust.getId());
         r.setVehicleId(veh.getId());
-        r.setStartDate(Validator.parseDate(txtStart.getText()));
-        r.setEndDate(Validator.parseDate(txtEnd.getText()));
+        r.setStartDate(txtStart.getDate());
+        r.setEndDate(txtEnd.getDate());
         r.setStatus((String) cboStatus.getSelectedItem());
         r.setDiscountId(((DiscountItem) cboDiscount.getSelectedItem()).id);
     }
@@ -264,7 +265,7 @@ public class ReservationsPanel extends JPanel {
 
     private void updateReservation() {
         if (selected == null) { JOptionPane.showMessageDialog(this, "Select a reservation first."); return; }
-        if ("converted".equals(selected.getStatus())) {
+        if ("rented".equals(selected.getStatus())) {
             JOptionPane.showMessageDialog(this, "This reservation was already turned into a rental and can no longer be edited.");
             return;
         }
@@ -284,7 +285,7 @@ public class ReservationsPanel extends JPanel {
     private void deleteReservation() {
         if (!AccessControl.requireAdmin(this, loggedInStaff, "delete reservations")) return;
         if (selected == null) { JOptionPane.showMessageDialog(this, "Select a reservation first."); return; }
-        if ("converted".equals(selected.getStatus())) {
+        if ("rented".equals(selected.getStatus())) {
             JOptionPane.showMessageDialog(this, "This reservation is linked to a rental, so it is kept for the rental history.");
             return;
         }
@@ -303,8 +304,8 @@ public class ReservationsPanel extends JPanel {
         txtId.setText("");
         if (cboCustomer.getItemCount() > 0) cboCustomer.setSelectedIndex(0);
         if (cboVehicle.getItemCount() > 0) cboVehicle.setSelectedIndex(0);
-        txtStart.setText(LocalDate.now().toString());
-        txtEnd.setText(LocalDate.now().plusDays(1).toString());
+        txtStart.setDate(LocalDate.now());
+        txtEnd.setDate(LocalDate.now().plusDays(1));
         if (cboDiscount.getItemCount() > 0) cboDiscount.setSelectedIndex(0);
         cboStatus.setSelectedItem("pending");
         table.clearSelection();

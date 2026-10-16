@@ -28,7 +28,7 @@ public class CustomerPanel extends JPanel {
     private final JTextField txtLastName = new JTextField(15);
     private final JTextField txtEmail = new JTextField(15);
     private final JTextField txtPhone = new JTextField(15);
-    private final JTextField txtLicense = new JTextField(15);
+    private final JTextField txtLicense = new PlaceholderTextField(15, "ex. D01-23-456789");
     private final JCheckBox chkActive = new JCheckBox("Active", true);
 
     private Customer selected;
@@ -45,13 +45,16 @@ public class CustomerPanel extends JPanel {
 
         add(buildForm(), BorderLayout.NORTH);
         FormSupport.onDoubleClick(table, this::onRowSelected);   // MouseListener: double-click a row to load it into the form
-        add(SearchBar.wrap(table, this::runSearch), BorderLayout.CENTER);
+        add(SearchBar.wrap(table, this::runSearch, this::refreshTable), BorderLayout.CENTER);
 
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) onRowSelected();
         });
 
         refreshTable();
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentShown(java.awt.event.ComponentEvent e) { refreshTable(); }
+        });
     }
 
     private JPanel buildForm() {
@@ -78,8 +81,6 @@ public class CustomerPanel extends JPanel {
         JButton btnDelete = new JButton("Delete");
         btnDelete.addActionListener(e -> ErrorHandler.run(this, this::deleteCustomer));
         JButton btnClear = new JButton("Clear");
-        JButton btnRefresh = new JButton("Refresh");
-        btnRefresh.addActionListener(e -> ErrorHandler.run(this, () -> refreshTable()));
         btnAdd.addActionListener(e -> ErrorHandler.run(this, this::addCustomer));
         btnUpdate.addActionListener(e -> ErrorHandler.run(this, this::updateCustomer));
         btnResetPassword.addActionListener(e -> ErrorHandler.run(this, this::resetPassword));
@@ -91,7 +92,6 @@ public class CustomerPanel extends JPanel {
         buttons.add(btnResetPassword);
         buttons.add(btnDelete);
         buttons.add(btnClear);
-        buttons.add(btnRefresh);
         gc.gridx = 0; gc.gridy = row; gc.gridwidth = 2;
         form.add(buttons, gc);
 
@@ -215,13 +215,13 @@ public class CustomerPanel extends JPanel {
         JOptionPane.showMessageDialog(this, "Password reset.");
     }
 
-    /** Duplicate records: e-mail and driver's license must be unique (blank = not entered, so it is skipped). */
+    /** Duplicate records: e-mail and driver's license must be unique. */
     private boolean duplicateContact(Customer c) {
         if (c.getEmail() != null && uniqueValues.customerEmailExists(c.getEmail(), c.getId())) {
             JOptionPane.showMessageDialog(this, "That email address is already used by another customer.");
             return true;
         }
-        if (c.getLicenseNumber() != null && uniqueValues.customerLicenseExists(c.getLicenseNumber(), c.getId())) {
+        if (uniqueValues.customerLicenseExists(c.getLicenseNumber(), c.getId())) {
             JOptionPane.showMessageDialog(this, "That driver's license number is already registered to another customer.");
             return true;
         }
@@ -242,6 +242,10 @@ public class CustomerPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Username, first name, and last name are required.");
             return null;
         }
+        if (txtLicense.getText().isBlank()) {
+            JOptionPane.showMessageDialog(this, "Driver's license number is required.");
+            return null;
+        }
         if (!Validator.isValidEmail(txtEmail.getText())) {
             JOptionPane.showMessageDialog(this, "Please enter a valid email address (e.g. name@example.com).",
                     "Invalid Email", JOptionPane.WARNING_MESSAGE);
@@ -255,11 +259,10 @@ public class CustomerPanel extends JPanel {
         c.setUsername(txtUsername.getText().trim());
         c.setFirstName(txtFirstName.getText().trim());
         c.setLastName(txtLastName.getText().trim());
-        // Optional fields: save a blank box as NULL, not "". The database has UNIQUE email / license_number, and
-        // two customers with an empty "" would be rejected as duplicates (NULLs never clash with each other).
+        // Optional email is saved as NULL when blank; the driver's license is required.
         c.setEmail(blankToNull(txtEmail.getText()));
         c.setPhone(blankToNull(txtPhone.getText()));
-        c.setLicenseNumber(blankToNull(txtLicense.getText()));
+        c.setLicenseNumber(txtLicense.getText().trim());
         c.setActive(chkActive.isSelected());
         return c;
     }

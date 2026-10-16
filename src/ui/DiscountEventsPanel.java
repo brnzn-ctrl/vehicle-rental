@@ -27,8 +27,8 @@ public class DiscountEventsPanel extends JPanel {
     private final JTextField txtId = FormSupport.idField();   // read-only, filled when a row is selected
 
     private final JTextField txtName = new JTextField(20);
-    private final JTextField txtStart = new JTextField(10);
-    private final JTextField txtEnd = new JTextField(10);
+    private final DatePickerField txtStart = new DatePickerField(null);
+    private final DatePickerField txtEnd = new DatePickerField(null);
     private final JTextField txtPercent = new JTextField(6);
     private final JCheckBox chkActive = new JCheckBox("Active", true);
 
@@ -47,12 +47,15 @@ public class DiscountEventsPanel extends JPanel {
 
         add(buildForm(), BorderLayout.NORTH);
         FormSupport.onDoubleClick(table, this::onRowSelected);   // MouseListener: double-click a row to load it into the form
-        add(SearchBar.wrap(table, this::runSearch), BorderLayout.CENTER);
+        add(SearchBar.wrap(table, this::runSearch, this::refreshTable), BorderLayout.CENTER);
 
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) onRowSelected();
         });
         refreshTable();
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentShown(java.awt.event.ComponentEvent e) { refreshTable(); }
+        });
     }
 
     private JPanel buildForm() {
@@ -65,8 +68,8 @@ public class DiscountEventsPanel extends JPanel {
         int row = 0;
         addField(form, gc, row++, "ID:", txtId);
         addField(form, gc, row++, "Event Name:", txtName);
-        addField(form, gc, row++, "Start Date (YYYY-MM-DD):", txtStart);
-        addField(form, gc, row++, "End Date (YYYY-MM-DD):", txtEnd);
+        addField(form, gc, row++, "Start Date:", txtStart);
+        addField(form, gc, row++, "End Date:", txtEnd);
         addField(form, gc, row++, "Discount Percent (1-100):", txtPercent);
 
         chkActive.setBackground(UITheme.BG_DARK);
@@ -78,8 +81,6 @@ public class DiscountEventsPanel extends JPanel {
         JButton btnUpdate = UITheme.primaryButton("Update");
         JButton btnDelete = UITheme.primaryButton("Delete");
         JButton btnClear = UITheme.primaryButton("Clear");
-        JButton btnRefresh = UITheme.primaryButton("Refresh");
-        btnRefresh.addActionListener(e -> ErrorHandler.run(this, () -> refreshTable()));
         btnAdd.addActionListener(e -> ErrorHandler.run(this, this::addEvent));
         btnUpdate.addActionListener(e -> ErrorHandler.run(this, this::updateEvent));
         btnDelete.addActionListener(e -> ErrorHandler.run(this, this::deleteEvent));
@@ -91,7 +92,6 @@ public class DiscountEventsPanel extends JPanel {
         buttons.add(btnUpdate);
         buttons.add(btnDelete);
         buttons.add(btnClear);
-        buttons.add(btnRefresh);
         gc.gridx = 0; gc.gridy = row; gc.gridwidth = 2;
         form.add(buttons, gc);
         return form;
@@ -134,8 +134,8 @@ public class DiscountEventsPanel extends JPanel {
         }
         FormSupport.showId(txtId, selected.getId());
         txtName.setText(selected.getEventName());
-        txtStart.setText(selected.getStartDate().toString());
-        txtEnd.setText(selected.getEndDate().toString());
+        txtStart.setDate(selected.getStartDate());
+        txtEnd.setDate(selected.getEndDate());
         txtPercent.setText(selected.getDiscountPercent().toString());
         chkActive.setSelected(selected.isActive());
     }
@@ -186,10 +186,10 @@ public class DiscountEventsPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "A discount event with that name already exists.");
             return null;
         }
-        LocalDate start = Validator.parseDate(txtStart.getText());
-        LocalDate end = Validator.parseDate(txtEnd.getText());
+        LocalDate start = txtStart.getDate();
+        LocalDate end = txtEnd.getDate();
         if (start == null || end == null) {
-            JOptionPane.showMessageDialog(this, "Start and end dates must be valid dates in YYYY-MM-DD format.");
+            JOptionPane.showMessageDialog(this, "Choose both a start date and an end date.");
             return null;
         }
         if (end.isBefore(start)) {
@@ -213,8 +213,8 @@ public class DiscountEventsPanel extends JPanel {
         selected = null;
         txtId.setText("");
         txtName.setText("");
-        txtStart.setText("");
-        txtEnd.setText("");
+        txtStart.setDate(null);
+        txtEnd.setDate(null);
         txtPercent.setText("");
         chkActive.setSelected(true);
         table.clearSelection();

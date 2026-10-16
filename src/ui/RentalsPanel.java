@@ -4,11 +4,13 @@ import util.Validator;
 
 import util.ErrorHandler;
 import util.AccessControl;
+import util.PasswordHasher;
 
 import dao.RentalDAO;
 import util.UITheme;
 import dao.DiscountEventDAO;
 import dao.CustomerDAO;
+import dao.UniqueValueChecker;
 import dao.VehicleDAO;
 import dao.ReservationDAO;
 import model.Reservation;
@@ -22,14 +24,13 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Map;
-import java.util.HashMap;
 
 /** Admin/Employee screen: walk-in checkout, returns with billing, and receipts. */
 public class RentalsPanel extends JPanel {
 
     private final RentalDAO rentalDAO = new RentalDAO();
     private final CustomerDAO customerDAO = new CustomerDAO();
+    private final UniqueValueChecker uniqueValues = new UniqueValueChecker();
     private final VehicleDAO vehicleDAO = new VehicleDAO();
     private final DiscountEventDAO discountDAO = new DiscountEventDAO();
     private final ReservationDAO reservationDAO = new ReservationDAO();
@@ -50,13 +51,135 @@ public class RentalsPanel extends JPanel {
         @Override public String toString() { return label; }
     }
 
+    private void addCustomerRecordFromCheckout() {
+        int answer = JOptionPane.showConfirmDialog(this,
+            "This customer needs a system record before checkout. Add one now?",
+            "Add Customer Record", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+        if (answer != JOptionPane.YES_OPTION) return;
+
+        Customer customer = promptForCustomerRecord();
+        if (customer == null) return;
+
+        loadCombos();
+        for (int i = 0; i < cboCustomer.getItemCount(); i++) {
+            if (cboCustomer.getItemAt(i).getId() == customer.getId()) {
+                cboCustomer.setSelectedIndex(i);
+                break;
+            }
+        }
+        chkCustomerRecordYes.setSelected(true);
+        chkCustomerRecordNo.setSelected(false);
+        cboCustomer.setEnabled(true);
+        refreshApprovedReservations();
+    }
+
+    private Customer promptForCustomerRecord() {
+        JTextField username = new JTextField(18);
+        JTextField firstName = new JTextField(18);
+        JTextField lastName = new JTextField(18);
+        JTextField email = new JTextField(18);
+        JTextField phone = new JTextField(18);
+        JTextField license = new PlaceholderTextField(18, "ex. D01-23-456789");
+
+        JPanel fields = new JPanel(new GridLayout(0, 2, 6, 6));
+        fields.add(new JLabel("Username:"));
+        fields.add(username);
+        fields.add(new JLabel("First name:"));
+        fields.add(firstName);
+        fields.add(new JLabel("Last name:"));
+        fields.add(lastName);
+        fields.add(new JLabel("Email (optional):"));
+        fields.add(email);
+        fields.add(new JLabel("Phone (optional, 11 digits):"));
+        fields.add(phone);
+        fields.add(new JLabel("Driver's license (required):"));
+        fields.add(license);
+
+        while (true) {
+            int result = JOptionPane.showConfirmDialog(this, fields, "New System Customer Record",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+            if (result != JOptionPane.OK_OPTION) return null;
+
+            String enteredUsername = username.getText().trim();
+            String enteredFirstName = firstName.getText().trim();
+            String enteredLastName = lastName.getText().trim();
+            String enteredEmail = blankToNull(email.getText());
+            String enteredPhone = blankToNull(phone.getText());
+            String enteredLicense = blankToNull(license.getText());
+
+            if (enteredUsername.isEmpty() || enteredFirstName.isEmpty() || enteredLastName.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Username, first name, and last name are required.",
+                    "Missing Information", JOptionPane.WARNING_MESSAGE);
+                continue;
+            }
+            if (enteredLicense == null) {
+                JOptionPane.showMessageDialog(this, "Driver's license number is required.",
+                    "Missing Information", JOptionPane.WARNING_MESSAGE);
+                continue;
+            }
+            if (!Validator.isValidEmail(enteredEmail)) {
+                JOptionPane.showMessageDialog(this, "Enter a valid email address or leave it blank.",
+                    "Invalid Email", JOptionPane.WARNING_MESSAGE);
+                continue;
+            }
+            if (!Validator.isValidPhone(enteredPhone)) {
+                JOptionPane.showMessageDialog(this, "Phone number must be exactly 11 digits or left blank.",
+                    "Invalid Phone", JOptionPane.WARNING_MESSAGE);
+                continue;
+            }
+            if (customerDAO.usernameExists(enteredUsername)) {
+                JOptionPane.showMessageDialog(this, "That username is already taken.",
+                    "Duplicate Username", JOptionPane.WARNING_MESSAGE);
+                continue;
+            }
+
+            Customer customer = new Customer();
+            customer.setUsername(enteredUsername);
+            customer.setFirstName(enteredFirstName);
+            customer.setLastName(enteredLastName);
+            customer.setEmail(enteredEmail);
+            customer.setPhone(enteredPhone);
+            customer.setLicenseNumber(enteredLicense);
+            customer.setActive(true);
+            if ((enteredEmail != null && uniqueValues.customerEmailExists(enteredEmail, 0))
+                    || (enteredLicense != null && uniqueValues.customerLicenseExists(enteredLicense, 0))) {
+                JOptionPane.showMessageDialog(this, "That email or driver's license is already registered.",
+                    "Duplicate Customer Information", JOptionPane.WARNING_MESSAGE);
+                continue;
+            }
+
+            String temporaryPassword = randomTemporaryPassword();
+            customer.setPasswordHash(PasswordHasher.hash(temporaryPassword));
+            customerDAO.insert(customer);
+            JOptionPane.showMessageDialog(this,
+                "System customer record added. Temporary password: " + temporaryPassword
+                    + "\nThe customer should change it after logging in.",
+                "Customer Added", JOptionPane.INFORMATION_MESSAGE);
+            return customer;
+        }
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.trim().isEmpty() ? null : value.trim();
+    }
+
+    private static String randomTemporaryPassword() {
+        String characters = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        StringBuilder password = new StringBuilder(10);
+        for (int i = 0; i < 10; i++) password.append(characters.charAt(random.nextInt(characters.length())));
+        return password.toString();
+    }
+
     private static final String WALK_IN = "Walk-in (no reservation)";
     private final JComboBox<Object> cboReservation = new JComboBox<>();
     private boolean loadingCombos = false;   // true while the boxes are being refilled (ignore their events)
 
     private final JComboBox<Customer> cboCustomer = new JComboBox<>();
+    private final JCheckBox chkCustomerRecordYes = new JCheckBox("Yes", true);
+    private final JCheckBox chkCustomerRecordNo = new JCheckBox("No");
     private final JComboBox<Vehicle> cboVehicle = new JComboBox<>();
-    private final JTextField txtDueDate = new JTextField(10);
+    private final DatePickerField txtDueDate = new DatePickerField(LocalDate.now().plusDays(1));
 
     private Rental selected;
 
@@ -69,16 +192,15 @@ public class RentalsPanel extends JPanel {
         add(buildForm(), BorderLayout.NORTH);
         // MouseListener: double-click an ongoing rental to start "Return & Pay" for it
         FormSupport.onDoubleClick(table, () -> ErrorHandler.run(this, this::returnAndPay));
-        add(SearchBar.wrap(table, this::runSearch), BorderLayout.CENTER);
+        add(SearchBar.wrap(table, this::runSearch, this::refreshData), BorderLayout.CENTER);
 
         table.getSelectionModel().addListSelectionListener(e -> {
             if (e.getValueIsAdjusting()) return;
             selected = rowSelectedRental();
             FormSupport.showId(txtId, selected == null ? 0 : selected.getId());
-            if (selected != null && "ongoing".equals(selected.getStatus())) txtDueDate.setText(selected.getDueDate().toString());
+            if (selected != null && "ongoing".equals(selected.getStatus())) txtDueDate.setDate(selected.getDueDate());
         });
 
-        txtDueDate.setText(LocalDate.now().plusDays(1).toString());
         loadCombos();
         refreshTable();
         addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -97,22 +219,49 @@ public class RentalsPanel extends JPanel {
         addField(form, gc, row++, "Selected Rental ID:", txtId);
         addField(form, gc, row++, "Approved reservation (optional):", cboReservation);
         cboReservation.addActionListener(e -> onReservationPicked());
+        JPanel recordChoice = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        recordChoice.setBackground(UITheme.BG_DARK);
+        chkCustomerRecordYes.setBackground(UITheme.BG_DARK);
+        chkCustomerRecordYes.setForeground(UITheme.TEXT_LIGHT);
+        chkCustomerRecordNo.setBackground(UITheme.BG_DARK);
+        chkCustomerRecordNo.setForeground(UITheme.TEXT_LIGHT);
+        recordChoice.add(chkCustomerRecordYes);
+        recordChoice.add(chkCustomerRecordNo);
+        addField(form, gc, row++, "Does customer have a system record?", recordChoice);
+        chkCustomerRecordYes.addActionListener(e -> {
+            if (!chkCustomerRecordYes.isSelected()) chkCustomerRecordYes.setSelected(true);
+            chkCustomerRecordNo.setSelected(false);
+            cboCustomer.setEnabled(true);
+            refreshApprovedReservations();
+        });
+        chkCustomerRecordNo.addActionListener(e -> {
+            if (!chkCustomerRecordNo.isSelected()) {
+                chkCustomerRecordNo.setSelected(true);
+                return;
+            }
+            chkCustomerRecordYes.setSelected(false);
+            cboCustomer.setEnabled(false);
+            cboReservation.setSelectedIndex(0);
+            refreshApprovedReservations();
+            ErrorHandler.run(this, this::addCustomerRecordFromCheckout);
+        });
         addField(form, gc, row++, "Customer:", cboCustomer);
+        cboCustomer.addActionListener(e -> {
+            if (!loadingCombos) refreshApprovedReservations();
+        });
         addField(form, gc, row++, "Vehicle (available only):", cboVehicle);
-        addField(form, gc, row++, "Due Date (YYYY-MM-DD):", txtDueDate);
+        addField(form, gc, row++, "Due Date:", txtDueDate);
 
         JButton btnCheckOut = UITheme.primaryButton("Check Out (New Rental)");
         JButton btnReturn = UITheme.primaryButton("Return & Pay");
         JButton btnUpdate = UITheme.primaryButton("Update Due Date");
         JButton btnDelete = UITheme.primaryButton("Delete");
         JButton btnClear = UITheme.primaryButton("Clear");
-        JButton btnRefresh = UITheme.primaryButton("Refresh");
         btnCheckOut.addActionListener(e -> ErrorHandler.run(this, this::checkOut));
         btnReturn.addActionListener(e -> ErrorHandler.run(this, this::returnAndPay));
         btnUpdate.addActionListener(e -> ErrorHandler.run(this, this::updateRental));
         btnDelete.addActionListener(e -> ErrorHandler.run(this, this::deleteRental));
         btnClear.addActionListener(e -> clearForm());
-        btnRefresh.addActionListener(e -> { loadCombos(); refreshTable(); });
 
         JPanel buttons = new JPanel();
         buttons.setBackground(UITheme.BG_DARK);
@@ -121,7 +270,6 @@ public class RentalsPanel extends JPanel {
         buttons.add(btnUpdate);
         buttons.add(btnDelete);
         buttons.add(btnClear);
-        buttons.add(btnRefresh);
         gc.gridx = 0; gc.gridy = row; gc.gridwidth = 2;
         form.add(buttons, gc);
 
@@ -141,25 +289,31 @@ public class RentalsPanel extends JPanel {
         loadingCombos = true;
         try {
             cboCustomer.removeAllItems();
-            Map<Integer, Customer> byId = new HashMap<>();
             for (Customer c : customerDAO.findAll()) {
-                byId.put(c.getId(), c);
                 if (c.isActive()) cboCustomer.addItem(c);
             }
 
             cboVehicle.removeAllItems();
             for (Vehicle v : vehicleDAO.findAll()) if ("available".equals(v.getStatus())) cboVehicle.addItem(v);
 
-            cboReservation.removeAllItems();
-            cboReservation.addItem(WALK_IN);
-            for (Reservation r : reservationDAO.findApproved()) {
-                Customer owner = byId.get(r.getCustomerId());
-                String who = owner == null ? "customer #" + r.getCustomerId() : owner.getFirstName() + " " + owner.getLastName();
-                cboReservation.addItem(new ReservationItem(r,
-                    "#" + r.getId() + " - " + who + " - " + r.getVehicleName() + " (" + r.getStartDate() + " to " + r.getEndDate() + ")"));
-            }
+            refreshApprovedReservations();
         } finally {
             loadingCombos = false;
+        }
+    }
+
+    private void refreshApprovedReservations() {
+        Customer customer = chkCustomerRecordYes.isSelected()
+            ? (Customer) cboCustomer.getSelectedItem() : null;
+        cboReservation.removeAllItems();
+        cboReservation.addItem(WALK_IN);
+        if (customer == null) return;
+
+        for (Reservation r : reservationDAO.findApproved()) {
+            if (r.getCustomerId() == customer.getId()) {
+                cboReservation.addItem(new ReservationItem(r,
+                    "#" + r.getId() + " - " + r.getVehicleName() + " (" + r.getStartDate() + " to " + r.getEndDate() + ")"));
+            }
         }
     }
 
@@ -169,14 +323,11 @@ public class RentalsPanel extends JPanel {
         if (!(cboReservation.getSelectedItem() instanceof ReservationItem)) return;   // walk-in: leave the form alone
         Reservation res = ((ReservationItem) cboReservation.getSelectedItem()).reservation;
 
-        for (int i = 0; i < cboCustomer.getItemCount(); i++) {
-            if (cboCustomer.getItemAt(i).getId() == res.getCustomerId()) { cboCustomer.setSelectedIndex(i); break; }
-        }
         boolean vehicleFound = false;
         for (int i = 0; i < cboVehicle.getItemCount(); i++) {
             if (cboVehicle.getItemAt(i).getId() == res.getVehicleId()) { cboVehicle.setSelectedIndex(i); vehicleFound = true; break; }
         }
-        txtDueDate.setText(res.getEndDate().toString());
+        txtDueDate.setDate(res.getEndDate());
         if (!vehicleFound) {
             JOptionPane.showMessageDialog(this,
                 "The reserved vehicle (" + res.getVehicleName() + ") is not available right now.\n"
@@ -190,6 +341,11 @@ public class RentalsPanel extends JPanel {
 
     private void runSearch(String text) {
         keyword = text;
+        refreshTable();
+    }
+
+    private void refreshData() {
+        loadCombos();
         refreshTable();
     }
 
@@ -211,15 +367,19 @@ public class RentalsPanel extends JPanel {
     }
 
     private void checkOut() {
+        if (!chkCustomerRecordYes.isSelected()) {
+            JOptionPane.showMessageDialog(this, "Add a system customer record before checking out this rental.");
+            return;
+        }
         Customer cust = (Customer) cboCustomer.getSelectedItem();
         Vehicle veh = (Vehicle) cboVehicle.getSelectedItem();
         if (cust == null || veh == null) {
             JOptionPane.showMessageDialog(this, "Select a customer and an available vehicle.");
             return;
         }
-        LocalDate due = Validator.parseDate(txtDueDate.getText());
+        LocalDate due = txtDueDate.getDate();
         if (due == null) {
-            JOptionPane.showMessageDialog(this, "Due date must be a valid date in YYYY-MM-DD format.");
+            JOptionPane.showMessageDialog(this, "Choose a due date.");
             return;
         }
         if (due.isBefore(LocalDate.now())) {
@@ -316,9 +476,9 @@ public class RentalsPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Only ongoing rentals can be changed. Closed rentals are kept as billing history.");
             return;
         }
-        LocalDate due = Validator.parseDate(txtDueDate.getText());
+        LocalDate due = txtDueDate.getDate();
         if (due == null) {
-            JOptionPane.showMessageDialog(this, "Due date must be a valid date in YYYY-MM-DD format.");
+            JOptionPane.showMessageDialog(this, "Choose a due date.");
             return;
         }
         if (due.isBefore(selected.getRentOutDate().toLocalDate())) {
@@ -356,8 +516,12 @@ public class RentalsPanel extends JPanel {
     private void clearForm() {
         selected = null;
         txtId.setText("");
-        txtDueDate.setText(LocalDate.now().plusDays(1).toString());
+        txtDueDate.setDate(LocalDate.now().plusDays(1));
+        chkCustomerRecordYes.setSelected(true);
+        chkCustomerRecordNo.setSelected(false);
+        cboCustomer.setEnabled(true);
         table.clearSelection();
+        refreshApprovedReservations();
         if (cboReservation.getItemCount() > 0) cboReservation.setSelectedIndex(0);
         if (cboCustomer.getItemCount() > 0) cboCustomer.setSelectedIndex(0);
         if (cboVehicle.getItemCount() > 0) cboVehicle.setSelectedIndex(0);

@@ -126,7 +126,7 @@ public class VehiclePanel extends JPanel {
 
         FormSupport.onDoubleClick(table, this::onRowSelected);   // MouseListener: double-click a row to load it into the form
 
-        add(SearchBar.wrap(table, this::runSearch), BorderLayout.CENTER);
+        add(SearchBar.wrap(table, this::runSearch, this::refreshData), BorderLayout.CENTER);
 
 
 
@@ -226,10 +226,6 @@ public class VehiclePanel extends JPanel {
 
         JButton btnClear = new JButton("Clear");
 
-        JButton btnRefresh = new JButton("Refresh");
-
-        btnRefresh.addActionListener(e -> ErrorHandler.run(this, () -> { VehicleCategory keep = (VehicleCategory) cboCategory.getSelectedItem(); loadCategories(); if (keep != null) selectComboByCategoryId(keep.getId()); refreshTable(); }));
-
         btnAdd.addActionListener(e -> ErrorHandler.run(this, this::addVehicle));
 
         btnUpdate.addActionListener(e -> ErrorHandler.run(this, this::updateVehicle));
@@ -249,8 +245,6 @@ public class VehiclePanel extends JPanel {
         buttons.add(btnDelete);
 
         buttons.add(btnClear);
-
-        buttons.add(btnRefresh);
 
         gc.gridx = 0; gc.gridy = row; gc.gridwidth = 4;
 
@@ -303,6 +297,13 @@ public class VehiclePanel extends JPanel {
     }
 
 
+
+    private void refreshData() {
+        VehicleCategory keep = (VehicleCategory) cboCategory.getSelectedItem();
+        loadCategories();
+        if (keep != null) selectComboByCategoryId(keep.getId());
+        refreshTable();
+    }
 
     private void refreshTable() {
 
@@ -677,4 +678,3 @@ public class VehiclePanel extends JPanel {
     }
 
 }
-

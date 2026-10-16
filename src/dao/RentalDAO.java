@@ -106,9 +106,9 @@ public class RentalDAO extends AbstractDAO<Rental> {
                     }
                 }
                 if (r.getReservationId() != null) {
-                    // the approved reservation becomes a rental: mark it "converted" (same transaction)
+                    // the approved reservation becomes a rental: mark it "rented" (same transaction)
                     try (PreparedStatement ps = c.prepareStatement(
-                            "UPDATE reservations SET status='converted' WHERE reservation_id=? AND status='approved'")) {
+                            "UPDATE reservations SET status='rented' WHERE reservation_id=? AND status='approved'")) {
                         ps.setInt(1, r.getReservationId());
                         if (ps.executeUpdate() == 0) {
                             throw new SQLException("That reservation is no longer approved. Refresh the list.", "VR003");
@@ -265,7 +265,7 @@ public class RentalDAO extends AbstractDAO<Rental> {
                 }
                 if (reservationId != null) {
                     try (PreparedStatement ps = c.prepareStatement(
-                            "UPDATE reservations SET status='approved' WHERE reservation_id=? AND status='converted'")) {
+                            "UPDATE reservations SET status='approved' WHERE reservation_id=? AND status='rented'")) {
                         ps.setInt(1, reservationId);
                         ps.executeUpdate();
                     }

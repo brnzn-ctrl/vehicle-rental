@@ -16,6 +16,11 @@ public final class SearchBar {
 
     /** Search box that runs a SQL LIKE query in the database through onSearch(keyword). */
     public static JPanel wrap(JTable table, Consumer<String> onSearch) {
+        return wrap(table, onSearch, null);
+    }
+
+    /** Search box with an optional refresh action aligned at the far right. */
+    public static JPanel wrap(JTable table, Consumer<String> onSearch, Runnable onRefresh) {
         table.setAutoCreateRowSorter(true);          // click a column heading to sort
 
         JTextField txtSearch = new JTextField(22);
@@ -32,12 +37,21 @@ public final class SearchBar {
         txtSearch.addActionListener(e -> util.ErrorHandler.run(table, apply));
         btnReset.addActionListener(e -> { txtSearch.setText(""); util.ErrorHandler.run(table, apply); });
 
-        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        bar.add(new JLabel("Search:"));
-        bar.add(txtSearch);
-        bar.add(btnSearch);
-        bar.add(btnReset);
-        bar.add(lblCount);
+        JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        controls.add(new JLabel("Search:"));
+        controls.add(txtSearch);
+        controls.add(btnSearch);
+        controls.add(btnReset);
+        controls.add(lblCount);
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.add(controls, BorderLayout.WEST);
+        if (onRefresh != null) {
+            JButton btnRefresh = new JButton("Refresh");
+            btnRefresh.addActionListener(e -> util.ErrorHandler.run(table, onRefresh));
+            JPanel refreshHolder = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+            refreshHolder.add(btnRefresh);
+            bar.add(refreshHolder, BorderLayout.EAST);
+        }
 
         JPanel panel = new JPanel(new BorderLayout(0, 4));
         panel.add(bar, BorderLayout.NORTH);
@@ -47,6 +61,11 @@ public final class SearchBar {
 
     /** Local filter over the rows already in the table (no database call). */
     public static JPanel wrap(JTable table) {
+        return wrap(table, (Runnable) null);
+    }
+
+    /** Local filter with an optional refresh action aligned at the far right. */
+    public static JPanel wrap(JTable table, Runnable onRefresh) {
         TableModel model = table.getModel();
         TableRowSorter<TableModel> sorter = new TableRowSorter<>(model);
         table.setRowSorter(sorter);
@@ -79,14 +98,23 @@ public final class SearchBar {
         txtSearch.addActionListener(e -> apply.run());
         btnReset.addActionListener(e -> { txtSearch.setText(""); cboColumn.setSelectedIndex(0); apply.run(); });
 
-        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        bar.add(new JLabel("Search:"));
-        bar.add(txtSearch);
-        bar.add(new JLabel("in"));
-        bar.add(cboColumn);
-        bar.add(btnSearch);
-        bar.add(btnReset);
-        bar.add(lblCount);
+        JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        controls.add(new JLabel("Search:"));
+        controls.add(txtSearch);
+        controls.add(new JLabel("in"));
+        controls.add(cboColumn);
+        controls.add(btnSearch);
+        controls.add(btnReset);
+        controls.add(lblCount);
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.add(controls, BorderLayout.WEST);
+        if (onRefresh != null) {
+            JButton btnRefresh = new JButton("Refresh");
+            btnRefresh.addActionListener(e -> util.ErrorHandler.run(table, onRefresh));
+            JPanel refreshHolder = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+            refreshHolder.add(btnRefresh);
+            bar.add(refreshHolder, BorderLayout.EAST);
+        }
 
         JPanel panel = new JPanel(new BorderLayout(0, 4));
         panel.add(bar, BorderLayout.NORTH);

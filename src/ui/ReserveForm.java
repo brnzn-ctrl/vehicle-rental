@@ -13,10 +13,7 @@ import java.awt.image.BufferedImage;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.function.BiFunction;
 
 /**
@@ -29,7 +26,7 @@ class ReserveForm extends JPanel {
 
     private LocalDate resultStart, resultEnd;
 
-    private final JSpinner fromSpinner, toSpinner;
+    private final DatePickerField fromDate, toDate;
     private final JLabel lblEstimate = new JLabel(" ");
     private final JLabel lblDeal = new JLabel(" ");
     private final JLabel lblError = new JLabel(" ");
@@ -51,9 +48,8 @@ class ReserveForm extends JPanel {
         this.discountDAO = discountDAO;
         this.validator = validator;
 
-        Date today = toDate(LocalDate.now());
-        fromSpinner = dateSpinner(today);
-        toSpinner = dateSpinner(toDate(LocalDate.now().plusDays(1)));
+        fromDate = new DatePickerField(LocalDate.now());
+        toDate = new DatePickerField(LocalDate.now().plusDays(1));
 
         JPanel root = this;
         setBorder(BorderFactory.createEmptyBorder(18, 20, 18, 20));
@@ -84,8 +80,8 @@ class ReserveForm extends JPanel {
         dates.setOpaque(false);
         dates.add(text("Start date", CustomerTheme.bold(14), CustomerTheme.MUTED));
         dates.add(text("End date", CustomerTheme.bold(14), CustomerTheme.MUTED));
-        dates.add(fromSpinner);
-        dates.add(toSpinner);
+        dates.add(fromDate);
+        dates.add(toDate);
 
         lblEstimate.setFont(CustomerTheme.bold(16)); lblEstimate.setForeground(CustomerTheme.TEXT);
         lblDeal.setFont(CustomerTheme.body(14));     lblDeal.setForeground(CustomerTheme.GOLD);
@@ -115,8 +111,8 @@ class ReserveForm extends JPanel {
         bottom.add(cancel); bottom.add(confirm);
         root.add(bottom, BorderLayout.SOUTH);
 
-        fromSpinner.addChangeListener(e -> refresh());
-        toSpinner.addChangeListener(e -> refresh());
+        fromDate.addDateChangeListener(e -> refresh());
+        toDate.addDateChangeListener(e -> refresh());
         refresh();
     }
 
@@ -128,7 +124,7 @@ class ReserveForm extends JPanel {
     }
 
     private void refresh() {
-        LocalDate s = toLocal((Date) fromSpinner.getValue()), e = toLocal((Date) toSpinner.getValue());
+        LocalDate s = fromDate.getDate(), e = toDate.getDate();
         lblError.setText(" ");
         if (e.isBefore(s)) {
             lblEstimate.setText("Pick an end date on or after the start date");
@@ -150,7 +146,7 @@ class ReserveForm extends JPanel {
     }
 
     private void confirm() {
-        LocalDate s = toLocal((Date) fromSpinner.getValue()), e = toLocal((Date) toSpinner.getValue());
+        LocalDate s = fromDate.getDate(), e = toDate.getDate();
         String problem;
         try { problem = validator.apply(s, e); }
         catch (RuntimeException ex) { problem = util.ErrorHandler.friendlyMessage(ex); }
@@ -169,21 +165,4 @@ class ReserveForm extends JPanel {
         JLabel l = new JLabel(t); l.setFont(f); l.setForeground(c); l.setAlignmentX(LEFT_ALIGNMENT); return l;
     }
 
-    private static JSpinner dateSpinner(Date value) {
-        JSpinner sp = new JSpinner(new SpinnerDateModel(value, null, null, Calendar.DAY_OF_MONTH));
-        JSpinner.DateEditor ed = new JSpinner.DateEditor(sp, "MMM dd, yyyy");
-        sp.setEditor(ed);
-        sp.setFont(CustomerTheme.bold(16));
-        JTextField tf = ed.getTextField();
-        tf.setFont(CustomerTheme.bold(16));
-        tf.setBackground(Color.WHITE);
-        tf.setForeground(CustomerTheme.TEXT);
-        tf.setCaretColor(CustomerTheme.GOLD);
-        tf.setHorizontalAlignment(JTextField.CENTER);
-        sp.setBorder(BorderFactory.createLineBorder(new Color(0, 0, 0, 60)));
-        return sp;
-    }
-
-    private static LocalDate toLocal(Date d) { return d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(); }
-    private static Date toDate(LocalDate d) { return Date.from(d.atStartOfDay(ZoneId.systemDefault()).toInstant()); }
 }

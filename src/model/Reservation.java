@@ -9,7 +9,7 @@ public class Reservation extends Entity {
     private String vehicleName;   // filled by JOIN for display
     private LocalDate startDate;
     private LocalDate endDate;
-    private String status;   // pending | approved | rejected | cancelled | converted
+    private String status;   // pending | approved | rejected | cancelled | rented
     private Integer discountId;   // nullable
     private String discountEventName;   // filled by JOIN, may be null
 

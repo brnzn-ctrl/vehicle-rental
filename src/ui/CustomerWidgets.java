@@ -161,7 +161,7 @@ final class CustomerWidgets {
             case "approved":  return CustomerTheme.GREEN;
             case "pending":   return new Color(214, 130, 10);
             case "rejected":  return CustomerTheme.RED;
-            case "converted": return new Color(40, 110, 200);
+            case "rented":    return new Color(40, 110, 200);
             default:          return CustomerTheme.MUTED;   // cancelled
         }
     }

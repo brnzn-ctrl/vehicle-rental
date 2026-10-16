@@ -44,12 +44,12 @@ public class ReportQueryDAO {
                              "ORDER BY r.rent_out_date DESC");
             case "Inventory Status":
                 return query("SELECT s.supply_name AS Supply, s.unit AS Unit, sup.supplier_name AS Supplier, " +
-                             "COALESCE(SUM(i.quantity),0) AS On_Hand, s.reorder_level AS Reorder_Level, " +
-                             "CAST(CASE WHEN COALESCE(SUM(i.quantity),0) <= s.reorder_level THEN 'LOW' ELSE 'OK' END AS VARCHAR(5)) AS Stock_Status " +
+                             "COALESCE(SUM(i.quantity),0) AS On_Hand, s.reorder_threshold AS Reorder_Threshold, " +
+                             "s.stock_level AS Stock_Level " +
                              "FROM supplies s " +
                              "LEFT JOIN suppliers sup ON s.supplier_id = sup.supplier_id " +
                              "LEFT JOIN inventory_stock i ON i.supply_id = s.supply_id " +
-                             "GROUP BY s.supply_id, s.supply_name, s.unit, sup.supplier_name, s.reorder_level " +
+                             "GROUP BY s.supply_id, s.supply_name, s.unit, sup.supplier_name, s.reorder_threshold, s.stock_level " +
                              "ORDER BY s.supply_name");
             case "Daily Transactions":
                 return query("SELECT p.payment_id AS Payment_ID, p.rental_id AS Rental_ID, " +

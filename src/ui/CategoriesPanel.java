@@ -40,12 +40,15 @@ public class CategoriesPanel extends JPanel {
 
         add(buildForm(), BorderLayout.NORTH);
         FormSupport.onDoubleClick(table, this::onRowSelected);   // MouseListener: double-click a row to load it into the form
-        add(SearchBar.wrap(table, this::runSearch), BorderLayout.CENTER);
+        add(SearchBar.wrap(table, this::runSearch, this::refreshTable), BorderLayout.CENTER);
 
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) onRowSelected();
         });
         refreshTable();
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentShown(java.awt.event.ComponentEvent e) { refreshTable(); }
+        });
     }
 
     private JPanel buildForm() {
@@ -73,8 +76,6 @@ public class CategoriesPanel extends JPanel {
         JButton btnUpdate = UITheme.primaryButton("Update");
         JButton btnDelete = UITheme.primaryButton("Delete");
         JButton btnClear = UITheme.primaryButton("Clear");
-        JButton btnRefresh = UITheme.primaryButton("Refresh");
-        btnRefresh.addActionListener(e -> ErrorHandler.run(this, () -> refreshTable()));
         btnAdd.addActionListener(e -> ErrorHandler.run(this, this::addCategory));
         btnUpdate.addActionListener(e -> ErrorHandler.run(this, this::updateCategory));
         btnDelete.addActionListener(e -> ErrorHandler.run(this, this::deleteCategory));
@@ -86,7 +87,6 @@ public class CategoriesPanel extends JPanel {
         buttons.add(btnUpdate);
         buttons.add(btnDelete);
         buttons.add(btnClear);
-        buttons.add(btnRefresh);
         gc.gridx = 0; gc.gridy = 2; gc.gridwidth = 2;
         form.add(buttons, gc);
         return form;

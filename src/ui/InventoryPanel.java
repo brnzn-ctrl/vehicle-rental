@@ -49,7 +49,7 @@ public class InventoryPanel extends JPanel {
 
         add(buildForm(), BorderLayout.NORTH);
         FormSupport.onDoubleClick(table, this::onRowSelected);   // MouseListener: double-click a row to load it into the form
-        add(SearchBar.wrap(table, this::runSearch), BorderLayout.CENTER);
+        add(SearchBar.wrap(table, this::runSearch, () -> { loadSupplies(); refreshTable(); refreshLowStockBanner(); }), BorderLayout.CENTER);
         add(lblLowStock, BorderLayout.SOUTH);
         lblLowStock.setForeground(UITheme.RED_ACCENT);
         lblLowStock.setFont(UITheme.FONT_HEADER);
@@ -83,8 +83,6 @@ public class InventoryPanel extends JPanel {
         JButton btnUpdate = UITheme.primaryButton("Update Entry");
         JButton btnDelete = UITheme.primaryButton("Delete Entry");
         JButton btnClear = UITheme.primaryButton("Clear");
-        JButton btnRefresh = UITheme.primaryButton("Refresh");
-        btnRefresh.addActionListener(e -> ErrorHandler.run(this, () -> { loadSupplies(); refreshTable(); refreshLowStockBanner(); }));
         btnAdd.addActionListener(e -> ErrorHandler.run(this, this::receiveStock));
         btnUpdate.addActionListener(e -> ErrorHandler.run(this, this::updateStock));
         btnDelete.addActionListener(e -> ErrorHandler.run(this, this::deleteStock));
@@ -96,7 +94,6 @@ public class InventoryPanel extends JPanel {
         buttons.add(btnUpdate);
         buttons.add(btnDelete);
         buttons.add(btnClear);
-        buttons.add(btnRefresh);
         gc.gridx = 0; gc.gridy = row; gc.gridwidth = 2;
         form.add(buttons, gc);
 
@@ -135,15 +132,29 @@ public class InventoryPanel extends JPanel {
     }
 
     private void refreshLowStockBanner() {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder critical = new StringBuilder();
+        StringBuilder low = new StringBuilder();
         for (Supply s : supplyDAO.findAll()) {
             int onHand = supplyDAO.currentQuantity(s.getId());
-            if (onHand <= s.getReorderLevel()) {
-                if (sb.length() > 0) sb.append(", ");
-                sb.append(s.getName()).append(" (").append(onHand).append(")");
+            if ("critical stock".equals(s.getStockLevel())) {
+                if (critical.length() > 0) critical.append(", ");
+                critical.append(s.getName()).append(" (").append(onHand).append(")");
+            } else if ("low stock".equals(s.getStockLevel())) {
+                if (low.length() > 0) low.append(", ");
+                low.append(s.getName()).append(" (").append(onHand).append(")");
             }
         }
-        lblLowStock.setText(sb.length() == 0 ? "All supplies above reorder level." : "Low stock: " + sb);
+        if (critical.length() == 0 && low.length() == 0) {
+            lblLowStock.setText("All supplies have sufficient stock.");
+        } else {
+            StringBuilder message = new StringBuilder();
+            if (critical.length() > 0) message.append("Critical stock: ").append(critical);
+            if (low.length() > 0) {
+                if (message.length() > 0) message.append("  |  ");
+                message.append("Low stock: ").append(low);
+            }
+            lblLowStock.setText(message.toString());
+        }
     }
 
     private void onRowSelected() {

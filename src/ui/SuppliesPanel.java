@@ -23,7 +23,7 @@ public class SuppliesPanel extends JPanel {
     private final SupplierDAO supplierDAO = new SupplierDAO();
 
     private final DefaultTableModel tableModel =
-        new DefaultTableModel(new Object[]{"ID", "Name", "Unit", "Supplier", "Reorder Level", "On Hand"}, 0) {
+        new DefaultTableModel(new Object[]{"ID", "Name", "Unit", "Supplier", "Reorder Threshold", "On Hand", "Stock Level"}, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
     private final JTable table = new JTable(tableModel);
@@ -32,7 +32,7 @@ public class SuppliesPanel extends JPanel {
     private final JTextField txtName = new JTextField(15);
     private final JTextField txtUnit = new JTextField(10);
     private final JComboBox<Supplier> cboSupplier = new JComboBox<>();
-    private final JTextField txtReorder = new JTextField(6);
+    private final JTextField txtReorderThreshold = new JTextField(6);
 
     private Supply selected;
 
@@ -49,7 +49,7 @@ public class SuppliesPanel extends JPanel {
 
         add(buildForm(), BorderLayout.NORTH);
         FormSupport.onDoubleClick(table, this::onRowSelected);   // MouseListener: double-click a row to load it into the form
-        add(SearchBar.wrap(table, this::runSearch), BorderLayout.CENTER);
+        add(SearchBar.wrap(table, this::runSearch, () -> { reloadSuppliers(); refreshTable(); }), BorderLayout.CENTER);
 
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) onRowSelected();
@@ -88,14 +88,12 @@ public class SuppliesPanel extends JPanel {
         addField(form, gc, row++, "Supply Name:", txtName);
         addField(form, gc, row++, "Unit (pcs, liters...):", txtUnit);
         addField(form, gc, row++, "Supplier:", cboSupplier);
-        addField(form, gc, row++, "Reorder Level:", txtReorder);
+        addField(form, gc, row++, "Reorder Threshold:", txtReorderThreshold);
 
         JButton btnAdd = UITheme.primaryButton("Save");
         JButton btnUpdate = UITheme.primaryButton("Update");
         JButton btnDelete = UITheme.primaryButton("Delete");
         JButton btnClear = UITheme.primaryButton("Clear");
-        JButton btnRefresh = UITheme.primaryButton("Refresh");
-        btnRefresh.addActionListener(e -> ErrorHandler.run(this, () -> { reloadSuppliers(); refreshTable(); }));
         btnAdd.addActionListener(e -> ErrorHandler.run(this, this::addSupply));
         btnUpdate.addActionListener(e -> ErrorHandler.run(this, this::updateSupply));
         btnDelete.addActionListener(e -> ErrorHandler.run(this, this::deleteSupply));
@@ -107,7 +105,6 @@ public class SuppliesPanel extends JPanel {
         buttons.add(btnUpdate);
         buttons.add(btnDelete);
         buttons.add(btnClear);
-        buttons.add(btnRefresh);
         gc.gridx = 0; gc.gridy = row; gc.gridwidth = 2;
         form.add(buttons, gc);
 
@@ -136,9 +133,16 @@ public class SuppliesPanel extends JPanel {
         for (Supply s : supplyDAO.search(keyword)) {
             int onHand = supplyDAO.currentQuantity(s.getId());
             tableModel.addRow(new Object[]{
-                s.getId(), s.getName(), s.getUnit(), s.getSupplierName() != null ? s.getSupplierName() : "—", s.getReorderLevel(), onHand
+                s.getId(), s.getName(), s.getUnit(), s.getSupplierName() != null ? s.getSupplierName() : "—",
+                s.getReorderThreshold(), onHand, displayStockLevel(s.getStockLevel())
             });
         }
+    }
+
+    private String displayStockLevel(String stockLevel) {
+        if ("critical stock".equals(stockLevel)) return "Critical Stock";
+        if ("low stock".equals(stockLevel)) return "Low Stock";
+        return "Sufficient";
     }
 
     private void onRowSelected() {
@@ -155,7 +159,7 @@ public class SuppliesPanel extends JPanel {
 
         txtName.setText(selected.getName());
         txtUnit.setText(selected.getUnit());
-        txtReorder.setText(String.valueOf(selected.getReorderLevel()));
+        txtReorderThreshold.setText(String.valueOf(selected.getReorderThreshold()));
         selectSupplierCombo(selected.getSupplierId());
     }
 
@@ -202,9 +206,9 @@ public class SuppliesPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Name and unit are required.");
             return null;
         }
-        Integer reorder = Validator.parseNonNegativeInt(txtReorder.getText());
-        if (reorder == null) {
-            JOptionPane.showMessageDialog(this, "Reorder level must be a whole number (0 or more).");
+        Integer reorderThreshold = Validator.parseNonNegativeInt(txtReorderThreshold.getText());
+        if (reorderThreshold == null) {
+            JOptionPane.showMessageDialog(this, "Reorder threshold must be a whole number (0 or more).");
             return null;
         }
         if (uniqueChecker.supplyNameExists(txtName.getText().trim(), s.getId())) {   // s.getId() is 0 for a new supply
@@ -215,7 +219,7 @@ public class SuppliesPanel extends JPanel {
         s.setName(txtName.getText().trim());
         s.setUnit(txtUnit.getText().trim());
         s.setSupplierId(sup != null ? sup.getId() : null);
-        s.setReorderLevel(reorder);
+        s.setReorderThreshold(reorderThreshold);
         return s;
     }
 
@@ -224,7 +228,7 @@ public class SuppliesPanel extends JPanel {
         txtId.setText("");
         txtName.setText("");
         txtUnit.setText("");
-        txtReorder.setText("");
+        txtReorderThreshold.setText("");
         cboSupplier.setSelectedIndex(0);
         table.clearSelection();
     }

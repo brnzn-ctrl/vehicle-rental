@@ -128,10 +128,11 @@ public final class SchemaInitializer {
         + " supply_name   VARCHAR(100) NOT NULL,"
         + " unit          VARCHAR(30)  NOT NULL,"
         + " supplier_id   INTEGER,"
-        + " reorder_level INTEGER NOT NULL DEFAULT 5,"
+        + " reorder_threshold INTEGER NOT NULL DEFAULT 5,"
+        + " stock_level VARCHAR(20) NOT NULL DEFAULT 'critical stock' CHECK (stock_level IN ('sufficient','low stock','critical stock')),"
         + " CONSTRAINT pk_supplies PRIMARY KEY (supply_id),"
         + " CONSTRAINT fk_supplies_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id),"
-        + " CONSTRAINT ck_supplies_reorder CHECK (reorder_level >= 0))" },
+        + " CONSTRAINT ck_supplies_reorder CHECK (reorder_threshold >= 0))" },
 
         { "RESERVATIONS",
           "CREATE TABLE reservations ("
@@ -148,7 +149,7 @@ public final class SchemaInitializer {
         + " CONSTRAINT fk_reservations_vehicle  FOREIGN KEY (vehicle_id)  REFERENCES vehicles (vehicle_id),"
         + " CONSTRAINT fk_reservations_discount FOREIGN KEY (discount_id) REFERENCES discount_events (discount_id),"
         + " CONSTRAINT ck_reservations_dates CHECK (end_date >= start_date),"
-        + " CONSTRAINT ck_reservations_status CHECK (status IN ('pending','approved','rejected','cancelled','converted')))" },
+        + " CONSTRAINT ck_reservations_status CHECK (status IN ('pending','approved','rejected','cancelled','rented')))" },
 
         { "RENTALS",
           "CREATE TABLE rentals ("
@@ -274,12 +275,15 @@ public final class SchemaInitializer {
                 if (!tableExists(c, t[0])) execute(c, t[1]);
             }
 
+            ensureSupplyStockSchema(c);
+            ensureReservationRentedStatus(c);
             List<String> warnings = new ArrayList<>();
             for (String[] col : COLUMNS_TO_ENSURE) ensureColumn(c, col[0], col[1], col[2], warnings);
             for (String[] pk : PRIMARY_KEYS_TO_ENSURE) ensurePrimaryKeyName(c, pk[0], pk[1], warnings);
             for (String w : warnings) System.err.println("[SchemaInitializer] " + w);
 
             seed(c, freshDatabase);
+            StockLevelUpdater.refreshAll(c);
         } catch (SQLException e) {
             throw new RuntimeException("Could not prepare the Derby database: " + e.getMessage(), e);
         }
@@ -322,6 +326,44 @@ public final class SchemaInitializer {
                 execute(c, "ALTER TABLE " + table + " ADD COLUMN " + column + " " + relaxed);
             } catch (SQLException e) {
                 warnings.add("Could not add column " + table + "." + column + ": " + e.getMessage());
+            }
+        }
+    }
+
+    private static void ensureSupplyStockSchema(Connection c) throws SQLException {
+        boolean oldThresholdExists = columnExists(c, "SUPPLIES", "REORDER_LEVEL");
+        boolean thresholdExists = columnExists(c, "SUPPLIES", "REORDER_THRESHOLD");
+        if (oldThresholdExists && !thresholdExists) {
+            execute(c, "ALTER TABLE supplies DROP CONSTRAINT ck_supplies_reorder");
+            execute(c, "RENAME COLUMN supplies.reorder_level TO reorder_threshold");
+            execute(c, "ALTER TABLE supplies ADD CONSTRAINT ck_supplies_reorder CHECK (reorder_threshold >= 0)");
+            thresholdExists = true;
+        }
+        if (!thresholdExists) {
+            execute(c, "ALTER TABLE supplies ADD COLUMN reorder_threshold INTEGER NOT NULL DEFAULT 5");
+        }
+        if (!columnExists(c, "SUPPLIES", "STOCK_LEVEL")) {
+            execute(c, "ALTER TABLE supplies ADD COLUMN stock_level VARCHAR(20) NOT NULL DEFAULT 'critical stock' "
+                    + "CHECK (stock_level IN ('sufficient','low stock','critical stock'))");
+        }
+    }
+
+    private static void ensureReservationRentedStatus(Connection c) throws SQLException {
+        if (constraintExists(c, "CK_RESERVATIONS_STATUS")) {
+            execute(c, "ALTER TABLE reservations DROP CONSTRAINT ck_reservations_status");
+        }
+        execute(c, "UPDATE reservations SET status = 'rented' WHERE status = 'converted'");
+        execute(c, "ALTER TABLE reservations ADD CONSTRAINT ck_reservations_status "
+                + "CHECK (status IN ('pending','approved','rejected','cancelled','rented'))");
+    }
+
+    private static boolean constraintExists(Connection c, String constraint) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement(
+                "SELECT COUNT(*) FROM SYS.SYSCONSTRAINTS WHERE CONSTRAINTNAME = ?")) {
+            ps.setString(1, constraint);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt(1) > 0;
             }
         }
     }
@@ -468,7 +510,7 @@ public final class SchemaInitializer {
             { "Wiper Blades",   "pcs",    "AutoCare Supplies", 4 },
         };
         try (PreparedStatement ps = c.prepareStatement(
-                "INSERT INTO supplies(supply_name, unit, supplier_id, reorder_level) VALUES (?,?,?,?)", Statement.RETURN_GENERATED_KEYS)) {
+                "INSERT INTO supplies(supply_name, unit, supplier_id, reorder_threshold) VALUES (?,?,?,?)", Statement.RETURN_GENERATED_KEYS)) {
             for (Object[] s : supplies) {
                 ps.setString(1, (String) s[0]);
                 ps.setString(2, (String) s[1]);

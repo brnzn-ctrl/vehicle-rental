@@ -1,7 +1,6 @@
 package ui;
 
 import dao.ReportQueryDAO;
-import util.Validator;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -11,12 +10,14 @@ import java.time.LocalDate;
 public class DetailedReportsPanel extends JPanel {
     private final ReportQueryDAO dao = new ReportQueryDAO();
     private final JComboBox<String> cboReport = new JComboBox<>(ReportQueryDAO.REPORT_NAMES);
-    private final JTextField txtDate = new JTextField(LocalDate.now().toString(), 10);
+    private final DatePickerField txtDate = new DatePickerField(LocalDate.now());
+    private final JLabel lblDate = new JLabel("Date:");
     private final DefaultTableModel model = new DefaultTableModel() {
         @Override public boolean isCellEditable(int r, int c) { return false; }
     };
     private final JTable table = new JTable(model);
     private final JLabel lblSummary = new JLabel(" ");
+    private boolean generated;
 
     public DetailedReportsPanel() {
         setLayout(new BorderLayout(10, 10));
@@ -27,29 +28,49 @@ public class DetailedReportsPanel extends JPanel {
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
         top.add(new JLabel("Report:"));
         top.add(cboReport);
-        top.add(new JLabel("Date (daily report, YYYY-MM-DD):"));
+        top.add(lblDate);
         top.add(txtDate);
         top.add(btnRun);
 
         add(top, BorderLayout.NORTH);
         add(SearchBar.wrap(table), BorderLayout.CENTER);
         add(lblSummary, BorderLayout.SOUTH);
+        cboReport.addActionListener(e -> updateDateVisibility());
+        updateDateVisibility();
+        addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentShown(java.awt.event.ComponentEvent e) {
+                if (generated) run(false);
+            }
+        });
     }
 
     private void run() {
+        run(true);
+    }
+
+    private void run(boolean notifyIfEmpty) {
         String name = (String) cboReport.getSelectedItem();
         LocalDate date = null;
         if ("Daily Transactions".equals(name)) {
-            date = Validator.parseDate(txtDate.getText());
+            date = txtDate.getDate();
             if (date == null) {
-                JOptionPane.showMessageDialog(this, "Enter a valid date, e.g. 2026-10-01.", "Invalid Date", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Choose a report date.", "Invalid Date", JOptionPane.WARNING_MESSAGE);
                 return;
             }
         }
         ReportQueryDAO.Result r = dao.run(name, date);
         model.setDataVector(r.rows.toArray(new Object[0][]), r.columns);
         lblSummary.setText(name + ": " + r.rows.size() + " record(s)");
-        if (r.rows.isEmpty())
+        generated = true;
+        if (notifyIfEmpty && r.rows.isEmpty())
             JOptionPane.showMessageDialog(this, "No records found for this report.", "Report", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void updateDateVisibility() {
+        boolean dailyReport = "Daily Transactions".equals(cboReport.getSelectedItem());
+        lblDate.setVisible(dailyReport);
+        txtDate.setVisible(dailyReport);
+        revalidate();
+        repaint();
     }
 }
