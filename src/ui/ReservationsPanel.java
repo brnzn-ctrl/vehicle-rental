@@ -3,6 +3,7 @@ package ui;
 import dao.CustomerDAO;
 import dao.DiscountEventDAO;
 import dao.ReservationDAO;
+import dao.UniqueValueChecker;
 import dao.VehicleDAO;
 import model.Customer;
 import model.DiscountEvent;
@@ -30,6 +31,7 @@ public class ReservationsPanel extends JPanel {
     private final CustomerDAO customerDAO = new CustomerDAO();
     private final VehicleDAO vehicleDAO = new VehicleDAO();
     private final DiscountEventDAO discountDAO = new DiscountEventDAO();
+    private final UniqueValueChecker uniqueValues = new UniqueValueChecker();
     private final Staff loggedInStaff;
 
     private static final String[] STATUSES = {"pending", "approved", "rejected", "cancelled", "rented"};
@@ -49,6 +51,8 @@ public class ReservationsPanel extends JPanel {
     }
 
     private final JComboBox<Customer> cboCustomer = new JComboBox<>();
+    private final JCheckBox chkCustomerRecordYes = new JCheckBox("Yes", true);
+    private final JCheckBox chkCustomerRecordNo = new JCheckBox("No");
     private final JComboBox<Vehicle> cboVehicle = new JComboBox<>();
     private final DatePickerField txtStart = new DatePickerField(LocalDate.now());
     private final DatePickerField txtEnd = new DatePickerField(LocalDate.now().plusDays(1));
@@ -89,6 +93,28 @@ public class ReservationsPanel extends JPanel {
 
         int row = 0;
         addField(form, gc, row++, "Reservation ID:", txtId);
+        JPanel recordChoice = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        recordChoice.setBackground(UITheme.BG_DARK);
+        chkCustomerRecordYes.setBackground(UITheme.BG_DARK);
+        chkCustomerRecordYes.setForeground(UITheme.TEXT_LIGHT);
+        chkCustomerRecordNo.setBackground(UITheme.BG_DARK);
+        chkCustomerRecordNo.setForeground(UITheme.TEXT_LIGHT);
+        recordChoice.add(chkCustomerRecordYes);
+        recordChoice.add(chkCustomerRecordNo);
+        addField(form, gc, row++, "Does customer have a system record?", recordChoice);
+        chkCustomerRecordYes.addActionListener(e -> {
+            chkCustomerRecordYes.setSelected(true);
+            chkCustomerRecordNo.setSelected(false);
+            cboCustomer.setEnabled(true);
+        });
+        chkCustomerRecordNo.addActionListener(e -> {
+            if (!chkCustomerRecordNo.isSelected()) {
+                resetCustomerRecordChoice();
+                return;
+            }
+            chkCustomerRecordYes.setSelected(false);
+            ErrorHandler.run(this, this::addCustomerRecordFromReservation);
+        });
         addField(form, gc, row++, "Customer:", cboCustomer);
         addField(form, gc, row++, "Vehicle:", cboVehicle);
         addField(form, gc, row++, "Start Date:", txtStart);
@@ -114,6 +140,26 @@ public class ReservationsPanel extends JPanel {
         gc.gridx = 0; gc.gridy = row; gc.gridwidth = 2;
         form.add(buttons, gc);
         return form;
+    }
+
+    private void addCustomerRecordFromReservation() {
+        try {
+            int answer = JOptionPane.showConfirmDialog(this,
+                "This customer needs a system record before a reservation can be saved. Add one now?",
+                "Add Customer Record", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+            if (answer != JOptionPane.YES_OPTION) return;
+            Customer customer = CustomerRecordDialog.prompt(this, customerDAO, uniqueValues);
+            if (customer == null) return;
+            loadCombos();
+            for (int i = 0; i < cboCustomer.getItemCount(); i++) {
+                if (cboCustomer.getItemAt(i).getId() == customer.getId()) {
+                    cboCustomer.setSelectedIndex(i);
+                    break;
+                }
+            }
+        } finally {
+            resetCustomerRecordChoice();
+        }
     }
 
     private void addField(JPanel form, GridBagConstraints gc, int row, String label, JComponent field) {
@@ -302,6 +348,7 @@ public class ReservationsPanel extends JPanel {
     private void clearForm() {
         selected = null;
         txtId.setText("");
+        resetCustomerRecordChoice();
         if (cboCustomer.getItemCount() > 0) cboCustomer.setSelectedIndex(0);
         if (cboVehicle.getItemCount() > 0) cboVehicle.setSelectedIndex(0);
         txtStart.setDate(LocalDate.now());
@@ -309,5 +356,11 @@ public class ReservationsPanel extends JPanel {
         if (cboDiscount.getItemCount() > 0) cboDiscount.setSelectedIndex(0);
         cboStatus.setSelectedItem("pending");
         table.clearSelection();
+    }
+
+    private void resetCustomerRecordChoice() {
+        chkCustomerRecordYes.setSelected(true);
+        chkCustomerRecordNo.setSelected(false);
+        cboCustomer.setEnabled(true);
     }
 }

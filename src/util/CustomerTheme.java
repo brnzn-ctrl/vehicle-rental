@@ -57,22 +57,24 @@ public final class CustomerTheme {
     public static JButton pill(String text, boolean gold) {
         JButton b = new JButton(text) {
             @Override protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
                 Graphics2D g2 = smooth(g);
                 boolean hover = getModel().isRollover() || getModel().isArmed();
                 int arc = getHeight();
+                Color textColor;
                 if (gold) {
                     g2.setColor(hover ? GOLD_HOVER : GOLD);
                     g2.fillRoundRect(0, 0, getWidth(), getHeight(), arc, arc);
-                    setForeground(Color.WHITE);
+                    textColor = Color.WHITE;
                 } else {
                     g2.setColor(hover ? new Color(0, 0, 0, 16) : new Color(0, 0, 0, 7));
                     g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arc, arc);
                     g2.setColor(hover ? GOLD : new Color(0, 0, 0, 70));
                     g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arc, arc);
-                    setForeground(TEXT);
+                    textColor = TEXT;
                 }
+                paintButtonLabel(g2, this, textColor);
                 g2.dispose();
-                super.paintComponent(g);
             }
         };
         b.setContentAreaFilled(false);
@@ -81,9 +83,19 @@ public final class CustomerTheme {
         b.setOpaque(false);
         b.setRolloverEnabled(true);
         b.setFont(bold(15));
+        b.setForeground(gold ? Color.WHITE : TEXT);
         b.setBorder(BorderFactory.createEmptyBorder(9, 22, 9, 22));
         b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return b;
+    }
+
+    public static void paintButtonLabel(Graphics2D g2, AbstractButton button, Color color) {
+        g2.setFont(button.getFont());
+        g2.setColor(color);
+        FontMetrics metrics = g2.getFontMetrics();
+        int x = (button.getWidth() - metrics.stringWidth(button.getText())) / 2;
+        int y = (button.getHeight() - metrics.getHeight()) / 2 + metrics.getAscent();
+        g2.drawString(button.getText(), x, y);
     }
 
     /** Calls onChange(true/false) when the mouse enters / leaves c or any of its children. */

@@ -293,20 +293,11 @@ public class MainFrame extends JFrame {
         p.setOpaque(false);
         p.setAlignmentX(Component.LEFT_ALIGNMENT);
         p.setBorder(BorderFactory.createEmptyBorder(12, 6, 6, 0));
-        JComponent logo = new JComponent() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(UITheme.RED_ACCENT);
-                g2.fillOval(0, 0, 34, 34);
-                g2.setColor(Color.WHITE);
-                g2.fillOval(9, 9, 16, 16);
-                g2.setColor(UITheme.RED_ACCENT);
-                g2.fillOval(13, 13, 8, 8);
-                g2.dispose();
-            }
-        };
-        logo.setPreferredSize(new Dimension(34, 34));
+        java.net.URL logoUrl = MainFrame.class.getResource("/resources/RESTRO_LOGO.png");
+        if (logoUrl == null) throw new IllegalStateException("Missing system logo: /resources/RESTRO_LOGO.png");
+        Image image = new ImageIcon(logoUrl).getImage().getScaledInstance(38, 38, Image.SCALE_SMOOTH);
+        JLabel logo = new JLabel(new ImageIcon(image));
+        logo.setPreferredSize(new Dimension(38, 38));
         JLabel name = new JLabel("Restro Rentals");
         name.setFont(UITheme.font(Font.BOLD, 20));
         name.setForeground(UITheme.NAVY);

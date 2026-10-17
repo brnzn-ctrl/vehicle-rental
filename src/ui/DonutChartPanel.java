@@ -69,16 +69,43 @@ public class DonutChartPanel extends JPanel {
         int ly = y + d + 22;
         g2.setFont(UITheme.font(Font.PLAIN, 13));
         fm = g2.getFontMetrics();
+        int maxValueWidth = 0;
+        int maxLabelWidth = 0;
+        for (Slice s : slices) {
+            maxValueWidth = Math.max(maxValueWidth, fm.stringWidth(legendValue(s, total)));
+            maxLabelWidth = Math.max(maxLabelWidth, fm.stringWidth(s.label));
+        }
+        boolean compactValues = 31 + maxLabelWidth + 8 + maxValueWidth + 14 > w;
+        if (compactValues) {
+            maxValueWidth = 0;
+            for (Slice s : slices) maxValueWidth = Math.max(maxValueWidth, fm.stringWidth(String.valueOf((long) s.value)));
+        }
+        int labelWidth = Math.max(0, w - 14 - maxValueWidth - 8 - 31);
         for (Slice s : slices) {
             g2.setColor(s.color);
             g2.fillRoundRect(14, ly - 9, 9, 9, 3, 3);
             g2.setColor(UITheme.TEXT_LIGHT);
-            g2.drawString(s.label, 31, ly);
-            String pct = total > 0 ? Math.round(100.0 * s.value / total) + "%" : "0%";
+            String label = s.label;
+            while (!label.isEmpty() && fm.stringWidth(label) > labelWidth) {
+                label = label.substring(0, label.length() - 1);
+            }
+            if (!label.equals(s.label) && labelWidth >= fm.stringWidth("...")) {
+                while (!label.isEmpty() && fm.stringWidth(label + "...") > labelWidth) {
+                    label = label.substring(0, label.length() - 1);
+                }
+                label += "...";
+            }
+            g2.drawString(label, 31, ly);
+            String value = compactValues ? String.valueOf((long) s.value) : legendValue(s, total);
             g2.setColor(UITheme.TEXT_MUTED);
-            g2.drawString(s.value > 0 || total == 0 ? pct + "  \u00B7  " + (long) s.value : pct, w - 14 - fm.stringWidth(s.value > 0 || total == 0 ? pct + "  \u00B7  " + (long) s.value : pct), ly);
+            g2.drawString(value, w - 14 - fm.stringWidth(value), ly);
             ly += 24;
         }
         g2.dispose();
+    }
+
+    private static String legendValue(Slice slice, double total) {
+        String pct = total > 0 ? Math.round(100.0 * slice.value / total) + "%" : "0%";
+        return slice.value > 0 || total == 0 ? pct + "  \u00B7  " + (long) slice.value : pct;
     }
 }

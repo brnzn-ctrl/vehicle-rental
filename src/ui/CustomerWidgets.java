@@ -66,21 +66,21 @@ final class CustomerWidgets {
             setRolloverEnabled(true);
         }
         @Override protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
             Graphics2D g2 = CustomerTheme.smooth(g);
             int a = getHeight();
             if (isSelected()) {
                 g2.setColor(CustomerTheme.GOLD);
                 g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, a, a);
-                setForeground(Color.WHITE);
+                CustomerTheme.paintButtonLabel(g2, this, Color.WHITE);
             } else {
                 g2.setColor(getModel().isRollover() ? new Color(0, 0, 0, 16) : new Color(255, 255, 255, 200));
                 g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, a, a);
                 g2.setColor(new Color(0, 0, 0, 60));
                 g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, a, a);
-                setForeground(CustomerTheme.TEXT);
+                CustomerTheme.paintButtonLabel(g2, this, CustomerTheme.TEXT);
             }
             g2.dispose();
-            super.paintComponent(g);
         }
     }
 
