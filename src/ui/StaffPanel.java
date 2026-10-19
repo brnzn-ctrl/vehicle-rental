@@ -208,8 +208,7 @@ public class StaffPanel extends JPanel {
         if (!AccessControl.requireAdmin(this, loggedInStaff, "delete staff accounts")) return;
         if (selected == null) { JOptionPane.showMessageDialog(this, "Select a staff account first."); return; }
         if (selected.getId() == loggedInStaff.getId()) { JOptionPane.showMessageDialog(this, "You cannot delete your own account."); return; }
-        int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to delete this record?\n" + selected.getUsername(), "Confirm Delete", JOptionPane.YES_NO_OPTION);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (!DeleteConfirmation.confirm(this, selected.getUsername())) return;
         staffDAO.delete(selected.getId());
         JOptionPane.showMessageDialog(this, "Staff account deleted.");
         clearForm();

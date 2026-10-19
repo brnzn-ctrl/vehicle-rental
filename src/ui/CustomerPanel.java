@@ -188,10 +188,7 @@ public class CustomerPanel extends JPanel {
     private void deleteCustomer() {
         if (!AccessControl.requireAdmin(this, loggedInStaff, "delete customers")) return;
         if (selected == null) { JOptionPane.showMessageDialog(this, "Select a customer first."); return; }
-        int confirm = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete this record?\n" + selected.getUsername(),
-                "Confirm Delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (!DeleteConfirmation.confirm(this, selected.getUsername())) return;
         try {
             customerDAO.delete(selected.getId());
             JOptionPane.showMessageDialog(this, "Customer deleted.");

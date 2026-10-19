@@ -10,7 +10,7 @@ public class Payment extends Entity {
     private String customerName;         // filled by JOIN for display
     private String processedByName;      // filled by JOIN for display
     private BigDecimal amount;
-    private String paymentMethod;        // cash | card | gcash | bank_transfer
+    private String paymentMethod;        // cash | card
     private LocalDateTime paymentDate;
     private int processedBy;             // staff_id
 

@@ -67,7 +67,7 @@ public class SuppliesPanel extends JPanel {
         Supplier keep = (Supplier) cboSupplier.getSelectedItem();
         cboSupplier.removeAllItems();
         cboSupplier.addItem(null); // "no supplier"
-        for (Supplier sup : supplierDAO.findAll()) cboSupplier.addItem(sup);
+        for (Supplier sup : supplierDAO.findByType(Supplier.TYPE_SUPPLIES)) cboSupplier.addItem(sup);
         if (keep != null) {
             for (int i = 0; i < cboSupplier.getItemCount(); i++) {
                 Supplier x = cboSupplier.getItemAt(i);
@@ -193,8 +193,7 @@ public class SuppliesPanel extends JPanel {
     private void deleteSupply() {
         if (!AccessControl.requireAdmin(this, loggedInStaff, "delete supplies")) return;
         if (selected == null) { JOptionPane.showMessageDialog(this, "Select a supply first."); return; }
-        int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to delete this record?\n" + selected.getName(), "Confirm Delete", JOptionPane.YES_NO_OPTION);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (!DeleteConfirmation.confirm(this, selected.getName())) return;
         supplyDAO.delete(selected.getId());
         JOptionPane.showMessageDialog(this, "Supply deleted.");
         clearForm();

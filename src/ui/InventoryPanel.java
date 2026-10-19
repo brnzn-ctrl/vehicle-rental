@@ -203,8 +203,7 @@ public class InventoryPanel extends JPanel {
     private void deleteStock() {
         if (!AccessControl.requireAdmin(this, loggedInStaff, "delete stock entries")) return;
         if (selected == null) { JOptionPane.showMessageDialog(this, "Select a stock entry first."); return; }
-        int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to delete this record?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (!DeleteConfirmation.confirm(this, selected.getSupplyName())) return;
         stockDAO.delete(selected.getId());
         JOptionPane.showMessageDialog(this, "Stock entry deleted.");
         clearForm();

@@ -335,10 +335,7 @@ public class ReservationsPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "This reservation is linked to a rental, so it is kept for the rental history.");
             return;
         }
-        int confirm = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete this record?\nReservation #" + selected.getId(),
-                "Confirm Delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (!DeleteConfirmation.confirm(this, "Reservation #" + selected.getId())) return;
         reservationDAO.delete(selected.getId());
         JOptionPane.showMessageDialog(this, "Reservation deleted.");
         clearForm();

@@ -28,7 +28,8 @@ import java.util.Map;
  *   suppliers, supplies, inventory_stock, expenses
  *
  * Relationships (1 ---- many):
- *   vehicle_categories -> vehicles        customers  -> reservations / rentals
+ *   vehicle_categories -> vehicles        suppliers -> vehicles / supplies
+ *   customers -> reservations / rentals
  *   vehicles           -> reservations / rentals
  *   discount_events    -> reservations    reservations -> rentals (optional: walk-in rentals have none)
  *   staff -> rentals / returns / payments / expenses
@@ -93,7 +94,9 @@ public final class SchemaInitializer {
         + " supplier_name  VARCHAR(100) NOT NULL,"
         + " contact_number VARCHAR(30),"
         + " address        VARCHAR(255),"
-        + " CONSTRAINT pk_suppliers PRIMARY KEY (supplier_id))" },
+        + " supplier_type  VARCHAR(20) NOT NULL DEFAULT 'supplies',"
+        + " CONSTRAINT pk_suppliers PRIMARY KEY (supplier_id),"
+        + " CONSTRAINT ck_suppliers_type CHECK (supplier_type IN ('car','supplies')))" },
 
         { "DISCOUNT_EVENTS",
           "CREATE TABLE discount_events ("
@@ -114,12 +117,18 @@ public final class SchemaInitializer {
         + " vehicle_name   VARCHAR(100) NOT NULL,"
         + " category_id    INTEGER NOT NULL,"
         + " daily_rate     DECIMAL(10,2) NOT NULL,"
+        + " unit_price     DECIMAL(10,2) NOT NULL DEFAULT 0,"
+        + " quantity       INTEGER NOT NULL DEFAULT 1,"
         + " status         VARCHAR(20) NOT NULL DEFAULT 'available',"
         + " image_filename VARCHAR(255),"
+        + " supplier_id    INTEGER,"
         + " CONSTRAINT pk_vehicles PRIMARY KEY (vehicle_id),"
         + " CONSTRAINT uq_vehicles_plate UNIQUE (plate_number),"
         + " CONSTRAINT fk_vehicles_category FOREIGN KEY (category_id) REFERENCES vehicle_categories (category_id),"
+        + " CONSTRAINT fk_vehicles_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id),"
         + " CONSTRAINT ck_vehicles_rate CHECK (daily_rate > 0),"
+        + " CONSTRAINT ck_vehicles_unit_price CHECK (unit_price >= 0),"
+        + " CONSTRAINT ck_vehicles_quantity CHECK (quantity >= 1),"
         + " CONSTRAINT ck_vehicles_status CHECK (status IN ('available','rented','maintenance','inactive')))" },
 
         { "SUPPLIES",
@@ -199,7 +208,7 @@ public final class SchemaInitializer {
         + " CONSTRAINT fk_payments_rental FOREIGN KEY (rental_id)    REFERENCES rentals (rental_id),"
         + " CONSTRAINT fk_payments_staff  FOREIGN KEY (processed_by) REFERENCES staff (staff_id),"
         + " CONSTRAINT ck_payments_amount CHECK (amount >= 0),"
-        + " CONSTRAINT ck_payments_method CHECK (payment_method IN ('cash','card','gcash','bank_transfer')))" },
+        + " CONSTRAINT ck_payments_method CHECK (payment_method IN ('cash','card')))" },
 
         { "INVENTORY_STOCK",
           "CREATE TABLE inventory_stock ("
@@ -236,7 +245,11 @@ public final class SchemaInitializer {
         { "CUSTOMERS",        "IS_ACTIVE",                 "BOOLEAN NOT NULL DEFAULT TRUE" },
         { "CUSTOMERS",        "ADDRESS",                   "VARCHAR(255)" },
         { "CUSTOMERS",        "LICENSE_NUMBER",            "VARCHAR(50)" },
+        { "SUPPLIERS",        "SUPPLIER_TYPE",             "VARCHAR(20) NOT NULL DEFAULT 'supplies'" },
         { "VEHICLES",         "IMAGE_FILENAME",            "VARCHAR(255)" },
+        { "VEHICLES",         "SUPPLIER_ID",               "INTEGER" },
+        { "VEHICLES",         "UNIT_PRICE",                "DECIMAL(10,2) NOT NULL DEFAULT 0" },
+        { "VEHICLES",         "QUANTITY",                  "INTEGER NOT NULL DEFAULT 1" },
         { "DISCOUNT_EVENTS",  "IS_ACTIVE",                 "BOOLEAN NOT NULL DEFAULT TRUE" },
         { "RESERVATIONS",     "RESERVATION_DATE",          "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP" },
         { "RESERVATIONS",     "DISCOUNT_ID",               "INTEGER" },
@@ -279,10 +292,12 @@ public final class SchemaInitializer {
             ensureReservationRentedStatus(c);
             List<String> warnings = new ArrayList<>();
             for (String[] col : COLUMNS_TO_ENSURE) ensureColumn(c, col[0], col[1], col[2], warnings);
+            ensureSupplierAndVehicleSupplierConstraints(c);
             for (String[] pk : PRIMARY_KEYS_TO_ENSURE) ensurePrimaryKeyName(c, pk[0], pk[1], warnings);
             for (String w : warnings) System.err.println("[SchemaInitializer] " + w);
 
             seed(c, freshDatabase);
+            ensureVehicleBrandSuppliers(c);
             StockLevelUpdater.refreshAll(c);
         } catch (SQLException e) {
             throw new RuntimeException("Could not prepare the Derby database: " + e.getMessage(), e);
@@ -357,6 +372,23 @@ public final class SchemaInitializer {
                 + "CHECK (status IN ('pending','approved','rejected','cancelled','rented'))");
     }
 
+    private static void ensureSupplierAndVehicleSupplierConstraints(Connection c) throws SQLException {
+        if (!constraintExists(c, "CK_SUPPLIERS_TYPE")) {
+            execute(c, "ALTER TABLE suppliers ADD CONSTRAINT ck_suppliers_type "
+                    + "CHECK (supplier_type IN ('car','supplies'))");
+        }
+        if (!constraintExists(c, "FK_VEHICLES_SUPPLIER")) {
+            execute(c, "ALTER TABLE vehicles ADD CONSTRAINT fk_vehicles_supplier "
+                    + "FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id)");
+        }
+        if (!constraintExists(c, "CK_VEHICLES_UNIT_PRICE")) {
+            execute(c, "ALTER TABLE vehicles ADD CONSTRAINT ck_vehicles_unit_price CHECK (unit_price >= 0)");
+        }
+        if (!constraintExists(c, "CK_VEHICLES_QUANTITY")) {
+            execute(c, "ALTER TABLE vehicles ADD CONSTRAINT ck_vehicles_quantity CHECK (quantity >= 1)");
+        }
+    }
+
     private static boolean constraintExists(Connection c, String constraint) throws SQLException {
         try (PreparedStatement ps = c.prepareStatement(
                 "SELECT COUNT(*) FROM SYS.SYSCONSTRAINTS WHERE CONSTRAINTNAME = ?")) {
@@ -366,6 +398,69 @@ public final class SchemaInitializer {
                 return rs.getInt(1) > 0;
             }
         }
+    }
+
+    private static void ensureVehicleBrandSuppliers(Connection c) throws SQLException {
+        boolean autoCommit = c.getAutoCommit();
+        c.setAutoCommit(false);
+        try {
+            List<String[]> unassigned = new ArrayList<>();
+            try (PreparedStatement vehicles = c.prepareStatement(
+                    "SELECT vehicle_id, vehicle_name FROM vehicles WHERE supplier_id IS NULL");
+                 ResultSet rows = vehicles.executeQuery()) {
+                while (rows.next()) {
+                    unassigned.add(new String[]{String.valueOf(rows.getInt("vehicle_id")), rows.getString("vehicle_name")});
+                }
+            }
+
+            Map<String, Integer> brandSupplierIds = new HashMap<>();
+            for (String[] vehicle : unassigned) {
+                int vehicleId = Integer.parseInt(vehicle[0]);
+                String vehicleName = vehicle[1];
+                String brand = vehicleName == null ? "" : vehicleName.trim().split("\\s+", 2)[0];
+                if (brand.isEmpty()) {
+                    throw new SQLException("Cannot determine a brand for vehicle #" + vehicleId);
+                }
+                String brandKey = brand.toUpperCase(java.util.Locale.ROOT);
+                Integer supplierId = brandSupplierIds.get(brandKey);
+                if (supplierId == null) {
+                    supplierId = findOrCreateCarSupplier(c, brand);
+                    brandSupplierIds.put(brandKey, supplierId);
+                }
+                try (PreparedStatement update = c.prepareStatement(
+                        "UPDATE vehicles SET supplier_id=? WHERE vehicle_id=? AND supplier_id IS NULL")) {
+                    update.setInt(1, supplierId);
+                    update.setInt(2, vehicleId);
+                    update.executeUpdate();
+                }
+            }
+            c.commit();
+        } catch (SQLException | RuntimeException e) {
+            c.rollback();
+            throw e;
+        } finally {
+            c.setAutoCommit(autoCommit);
+        }
+    }
+
+    private static int findOrCreateCarSupplier(Connection c, String brand) throws SQLException {
+        try (PreparedStatement find = c.prepareStatement(
+                "SELECT supplier_id FROM suppliers WHERE UPPER(supplier_name)=? AND supplier_type='car'")) {
+            find.setString(1, brand.toUpperCase(java.util.Locale.ROOT));
+            try (ResultSet rows = find.executeQuery()) {
+                if (rows.next()) return rows.getInt("supplier_id");
+            }
+        }
+        try (PreparedStatement insert = c.prepareStatement(
+                "INSERT INTO suppliers(supplier_name, supplier_type) VALUES (?, 'car')",
+                Statement.RETURN_GENERATED_KEYS)) {
+            insert.setString(1, brand);
+            insert.executeUpdate();
+            try (ResultSet keys = insert.getGeneratedKeys()) {
+                if (keys.next()) return keys.getInt(1);
+            }
+        }
+        throw new SQLException("Could not create car supplier for brand " + brand);
     }
 
     /** If the table's single primary-key column has another name, rename it to the name the DAO expects. */

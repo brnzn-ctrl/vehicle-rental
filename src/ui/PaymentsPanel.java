@@ -18,7 +18,7 @@ import java.util.List;
 /** Admin/Employee screen: view, search, update and delete payments (JTable, JOIN to rentals/customers/vehicles/staff). */
 public class PaymentsPanel extends JPanel {
 
-    private static final String[] METHODS = {"cash", "card", "gcash", "bank_transfer"};
+    private static final String[] METHODS = {"cash", "card"};
     private static final BigDecimal MAX_AMOUNT = new BigDecimal("99999999.99");   // DECIMAL(10,2)
 
     private final PaymentDAO paymentDAO = new PaymentDAO();
@@ -168,10 +168,7 @@ public class PaymentsPanel extends JPanel {
     private void deletePayment() {
         if (!AccessControl.requireAdmin(this, loggedInStaff, "delete payments")) return;
         if (selectedId == 0) { JOptionPane.showMessageDialog(this, "Select a payment first."); return; }
-        int confirm = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete this record?\nPayment #" + selectedId,
-                "Confirm Delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (!DeleteConfirmation.confirm(this, "Payment #" + selectedId)) return;
         paymentDAO.delete(selectedId);
         JOptionPane.showMessageDialog(this, "Payment deleted.");
         clearForm();

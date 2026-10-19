@@ -16,9 +16,10 @@ public class SuppliersPanel extends JPanel {
     private final dao.UniqueValueChecker uniqueChecker = new dao.UniqueValueChecker();
 
     private final SupplierDAO supplierDAO = new SupplierDAO();
+    private final String supplierType;
 
     private final DefaultTableModel tableModel =
-        new DefaultTableModel(new Object[]{"ID", "Supplier Name", "Contact Number", "Address"}, 0) {
+        new DefaultTableModel(new Object[]{"ID", "Supplier Name", "Supplier Type", "Contact Number", "Address"}, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
     private final JTable table = new JTable(tableModel);
@@ -33,10 +34,13 @@ public class SuppliersPanel extends JPanel {
     private final Staff loggedInStaff;   // used for the admin-only Delete
 
     /** Without a logged-in staff member nobody counts as admin, so Delete stays locked. Use SuppliersPanel(Staff). */
-    public SuppliersPanel() { this(null); }
+    public SuppliersPanel() { this(null, Supplier.TYPE_SUPPLIES); }
 
-    public SuppliersPanel(Staff loggedInStaff) {
+    public SuppliersPanel(Staff loggedInStaff) { this(loggedInStaff, Supplier.TYPE_SUPPLIES); }
+
+    public SuppliersPanel(Staff loggedInStaff, String supplierType) {
         this.loggedInStaff = loggedInStaff;
+        this.supplierType = supplierType;
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         setBackground(UITheme.BG_DARK);
@@ -106,8 +110,8 @@ public class SuppliersPanel extends JPanel {
 
     private void refreshTable() {
         tableModel.setRowCount(0);
-        for (Supplier s : supplierDAO.search(keyword)) {
-            tableModel.addRow(new Object[]{s.getId(), s.getName(), s.getContactNumber() == null ? "" : s.getContactNumber(),
+        for (Supplier s : supplierDAO.searchByType(supplierType, keyword)) {
+            tableModel.addRow(new Object[]{s.getId(), s.getName(), s.getTypeLabel(), s.getContactNumber() == null ? "" : s.getContactNumber(),
                 s.getAddress() == null ? "" : s.getAddress()});
         }
     }
@@ -150,10 +154,7 @@ public class SuppliersPanel extends JPanel {
     private void deleteSupplier() {
         if (!AccessControl.requireAdmin(this, loggedInStaff, "delete suppliers")) return;
         if (selected == null) { JOptionPane.showMessageDialog(this, "Select a supplier first."); return; }
-        int confirm = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete this record?\n" + selected.getName(),
-                "Confirm Delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (!DeleteConfirmation.confirm(this, selected.getName())) return;
         supplierDAO.delete(selected.getId());   // blocked by the foreign key if a supply still uses this supplier
         JOptionPane.showMessageDialog(this, "Supplier deleted.");
         clearForm();
@@ -178,6 +179,7 @@ public class SuppliersPanel extends JPanel {
         s.setName(name);
         s.setContactNumber(Validator.isBlank(txtContact.getText()) ? null : txtContact.getText().trim());
         s.setAddress(Validator.isBlank(txtAddress.getText()) ? null : txtAddress.getText().trim());
+        s.setType(supplierType);
         return s;
     }
 

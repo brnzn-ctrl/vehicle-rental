@@ -62,6 +62,8 @@ CREATE TABLE suppliers (
   supplier_name  VARCHAR(100) NOT NULL,
   contact_number VARCHAR(30),
   address        VARCHAR(255),
+  supplier_type  VARCHAR(20) NOT NULL DEFAULT 'supplies',
+  CONSTRAINT ck_suppliers_type CHECK (supplier_type IN ('car','supplies')),
   CONSTRAINT pk_suppliers PRIMARY KEY (supplier_id));
 
 CREATE TABLE discount_events (
@@ -81,11 +83,17 @@ CREATE TABLE vehicles (
   vehicle_name   VARCHAR(100) NOT NULL,
   category_id    INTEGER NOT NULL,
   daily_rate     DECIMAL(10,2) NOT NULL,
+  unit_price     DECIMAL(10,2) NOT NULL DEFAULT 0,
+  quantity       INTEGER NOT NULL DEFAULT 1,
   status         VARCHAR(20) NOT NULL DEFAULT 'available',
   image_filename VARCHAR(255),
+  supplier_id    INTEGER,
   CONSTRAINT pk_vehicles PRIMARY KEY (vehicle_id),
   CONSTRAINT uq_vehicles_plate UNIQUE (plate_number),
   CONSTRAINT fk_vehicles_category FOREIGN KEY (category_id) REFERENCES vehicle_categories (category_id),
+  CONSTRAINT fk_vehicles_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers (supplier_id),
+  CONSTRAINT ck_vehicles_unit_price CHECK (unit_price >= 0),
+  CONSTRAINT ck_vehicles_quantity CHECK (quantity >= 1),
   CONSTRAINT ck_vehicles_rate CHECK (daily_rate > 0),
   CONSTRAINT ck_vehicles_status CHECK (status IN ('available','rented','maintenance','inactive')));
 
@@ -160,7 +168,7 @@ CREATE TABLE payments (
   CONSTRAINT fk_payments_rental FOREIGN KEY (rental_id)    REFERENCES rentals (rental_id),
   CONSTRAINT fk_payments_staff  FOREIGN KEY (processed_by) REFERENCES staff (staff_id),
   CONSTRAINT ck_payments_amount CHECK (amount >= 0),
-  CONSTRAINT ck_payments_method CHECK (payment_method IN ('cash','card','gcash','bank_transfer')));
+  CONSTRAINT ck_payments_method CHECK (payment_method IN ('cash','card')));
 
 CREATE TABLE inventory_stock (
   stock_id      INTEGER NOT NULL GENERATED ALWAYS AS IDENTITY,
@@ -209,6 +217,21 @@ INSERT INTO customers (username, password_hash, first_name, last_name, email, ph
 INSERT INTO suppliers (supplier_name, contact_number, address) VALUES
   ('AutoCare Supplies', '09191112222', 'Pasig City'),
   ('FuelMax Trading',   '09193334444', 'Mandaluyong City');
+
+INSERT INTO suppliers (supplier_name, supplier_type) VALUES
+  ('Toyota', 'car'),
+  ('Ford', 'car'),
+  ('Honda', 'car');
+
+UPDATE vehicles
+   SET supplier_id = (SELECT supplier_id FROM suppliers WHERE supplier_name='Toyota' AND supplier_type='car')
+ WHERE vehicle_name LIKE 'Toyota %';
+UPDATE vehicles
+   SET supplier_id = (SELECT supplier_id FROM suppliers WHERE supplier_name='Ford' AND supplier_type='car')
+ WHERE vehicle_name LIKE 'Ford %';
+UPDATE vehicles
+   SET supplier_id = (SELECT supplier_id FROM suppliers WHERE supplier_name='Honda' AND supplier_type='car')
+ WHERE vehicle_name LIKE 'Honda %';
 
 INSERT INTO supplies (supply_name, unit, supplier_id, reorder_level) VALUES
   ('Engine Oil',    'liters',  (SELECT supplier_id FROM suppliers WHERE supplier_name='AutoCare Supplies'), 10),

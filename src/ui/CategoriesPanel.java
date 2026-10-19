@@ -142,10 +142,7 @@ public class CategoriesPanel extends JPanel {
     private void deleteCategory() {
         if (!AccessControl.requireAdmin(this, loggedInStaff, "delete vehicle categories")) return;
         if (selected == null) { JOptionPane.showMessageDialog(this, "Select a category first."); return; }
-        int confirm = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete this record?\n" + selected.getName(),
-                "Confirm Delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (!DeleteConfirmation.confirm(this, selected.getName())) return;
         categoryDAO.delete(selected.getId());   // blocked by the foreign key if vehicles still use it
         JOptionPane.showMessageDialog(this, "Category deleted.");
         clearForm();

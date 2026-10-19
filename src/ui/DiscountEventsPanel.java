@@ -162,10 +162,7 @@ public class DiscountEventsPanel extends JPanel {
     private void deleteEvent() {
         if (!AccessControl.requireAdmin(this, loggedInStaff, "delete discount events")) return;
         if (selected == null) { JOptionPane.showMessageDialog(this, "Select a discount event first."); return; }
-        int confirm = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete this record?\n" + selected.getEventName(),
-                "Confirm Delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (!DeleteConfirmation.confirm(this, selected.getEventName())) return;
         discountDAO.delete(selected.getId());   // blocked by the foreign key if a reservation used it -> untick Active instead
         JOptionPane.showMessageDialog(this, "Discount event deleted.");
         clearForm();

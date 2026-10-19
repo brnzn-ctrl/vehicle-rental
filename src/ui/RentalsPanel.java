@@ -99,13 +99,17 @@ public class RentalsPanel extends JPanel {
             if (e.getValueIsAdjusting()) return;
             selected = rowSelectedRental();
             FormSupport.showId(txtId, selected == null ? 0 : selected.getId());
-            if (selected != null && "ongoing".equals(selected.getStatus())) txtDueDate.setDate(selected.getDueDate());
+            if (selected != null) fillFormFromRental(selected);
         });
 
         loadCombos();
         refreshTable();
         addComponentListener(new java.awt.event.ComponentAdapter() {
-            @Override public void componentShown(java.awt.event.ComponentEvent e) { loadCombos(); refreshTable(); }
+            @Override public void componentShown(java.awt.event.ComponentEvent e) {
+                loadCombos();
+                if (selected != null) fillFormFromRental(selected);
+                refreshTable();
+            }
         });
     }
 
@@ -150,7 +154,7 @@ public class RentalsPanel extends JPanel {
         cboCustomer.addActionListener(e -> {
             if (!loadingCombos) refreshApprovedReservations();
         });
-        addField(form, gc, row++, "Vehicle (available only):", cboVehicle);
+        addField(form, gc, row++, "Vehicle:", cboVehicle);
         addField(form, gc, row++, "Due Date:", txtDueDate);
 
         JButton btnCheckOut = UITheme.primaryButton("Check Out (New Rental)");
@@ -201,6 +205,102 @@ public class RentalsPanel extends JPanel {
         } finally {
             loadingCombos = false;
         }
+    }
+
+    private void fillFormFromRental(Rental rental) {
+        loadingCombos = true;
+        try {
+            chkCustomerRecordYes.setSelected(true);
+            chkCustomerRecordNo.setSelected(false);
+            cboCustomer.setEnabled(true);
+
+            Customer customer = findCustomer(rental.getCustomerId());
+            if (customer == null) customer = customerDAO.findById(rental.getCustomerId());
+            if (customer != null) {
+                if (!containsCustomer(customer.getId())) cboCustomer.addItem(customer);
+                selectCustomer(customer.getId());
+            }
+
+            Vehicle vehicle = findVehicle(rental.getVehicleId());
+            if (vehicle == null) vehicle = vehicleDAO.findById(rental.getVehicleId());
+            if (vehicle != null) {
+                if (!containsVehicle(vehicle.getId())) cboVehicle.addItem(vehicle);
+                selectVehicle(vehicle.getId());
+            }
+
+            refreshApprovedReservations();
+            if (rental.getReservationId() != null) {
+                Reservation reservation = reservationDAO.findById(rental.getReservationId());
+                if (reservation != null) {
+                    ReservationItem item = findReservationItem(reservation.getId());
+                    if (item == null) {
+                        item = new ReservationItem(reservation,
+                            "#" + reservation.getId() + " - " + reservation.getVehicleName()
+                                + " (" + reservation.getStartDate() + " to " + reservation.getEndDate() + ")");
+                        cboReservation.addItem(item);
+                    }
+                    cboReservation.setSelectedItem(item);
+                }
+            } else if (cboReservation.getItemCount() > 0) {
+                cboReservation.setSelectedIndex(0);
+            }
+            txtDueDate.setDate(rental.getDueDate());
+        } finally {
+            loadingCombos = false;
+        }
+    }
+
+    private Customer findCustomer(int customerId) {
+        for (int i = 0; i < cboCustomer.getItemCount(); i++) {
+            Customer customer = cboCustomer.getItemAt(i);
+            if (customer.getId() == customerId) return customer;
+        }
+        return null;
+    }
+
+    private boolean containsCustomer(int customerId) {
+        return findCustomer(customerId) != null;
+    }
+
+    private void selectCustomer(int customerId) {
+        for (int i = 0; i < cboCustomer.getItemCount(); i++) {
+            if (cboCustomer.getItemAt(i).getId() == customerId) {
+                cboCustomer.setSelectedIndex(i);
+                return;
+            }
+        }
+    }
+
+    private Vehicle findVehicle(int vehicleId) {
+        for (int i = 0; i < cboVehicle.getItemCount(); i++) {
+            Vehicle vehicle = cboVehicle.getItemAt(i);
+            if (vehicle.getId() == vehicleId) return vehicle;
+        }
+        return null;
+    }
+
+    private boolean containsVehicle(int vehicleId) {
+        return findVehicle(vehicleId) != null;
+    }
+
+    private void selectVehicle(int vehicleId) {
+        for (int i = 0; i < cboVehicle.getItemCount(); i++) {
+            if (cboVehicle.getItemAt(i).getId() == vehicleId) {
+                cboVehicle.setSelectedIndex(i);
+                return;
+            }
+        }
+    }
+
+    private ReservationItem findReservationItem(int reservationId) {
+        for (int i = 0; i < cboReservation.getItemCount(); i++) {
+            Object item = cboReservation.getItemAt(i);
+            if (item instanceof ReservationItem
+                    && ((ReservationItem) item).reservation.getId() == reservationId) {
+                return (ReservationItem) item;
+            }
+        }
+        return null;
     }
 
     private void refreshApprovedReservations() {
@@ -330,7 +430,7 @@ public class RentalsPanel extends JPanel {
         JTextField txtNotes = new JTextField();
         JTextField txtDamage = new JTextField("0");
         // Payment method: JRadioButtons in one ButtonGroup (only one can be chosen)
-        String[] methods = {"cash", "card", "gcash", "bank_transfer"};
+        String[] methods = {"cash", "card"};
         ButtonGroup methodGroup = new ButtonGroup();
         JPanel methodPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         JRadioButton[] methodButtons = new JRadioButton[methods.length];
@@ -401,11 +501,9 @@ public class RentalsPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Only ongoing rentals can be deleted. Closed rentals are kept as billing history.");
             return;
         }
-        int confirm = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete this record?\nRental #" + selected.getId() + " - " + selected.getVehicleName()
-              + " - " + selected.getCustomerName() + "\nThe vehicle will be set back to available.",
-                "Confirm Delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (!DeleteConfirmation.confirm(this,
+                "Rental #" + selected.getId() + " - " + selected.getVehicleName()
+              + " - " + selected.getCustomerName() + "\nThe vehicle will be set back to available.")) return;
         rentalDAO.deleteOngoing(selected.getId());
         JOptionPane.showMessageDialog(this, "Rental deleted.");
         clearForm();
@@ -422,7 +520,7 @@ public class RentalsPanel extends JPanel {
         chkCustomerRecordNo.setSelected(false);
         cboCustomer.setEnabled(true);
         table.clearSelection();
-        refreshApprovedReservations();
+        loadCombos();
         if (cboReservation.getItemCount() > 0) cboReservation.setSelectedIndex(0);
         if (cboCustomer.getItemCount() > 0) cboCustomer.setSelectedIndex(0);
         if (cboVehicle.getItemCount() > 0) cboVehicle.setSelectedIndex(0);

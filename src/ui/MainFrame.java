@@ -19,7 +19,7 @@ public class MainFrame extends JFrame {
     private static final Map<String, String> ICONS = new HashMap<>();
     static {
         ICONS.put("Dashboard", "dashboard");
-        ICONS.put("Vehicle Fleet", "car");
+        ICONS.put("Vehicles", "car");
         ICONS.put("Customer Accounts", "users");
         ICONS.put("Reservations", "calendar");
         ICONS.put("Rental Checkout", "key");
@@ -72,9 +72,16 @@ public class MainFrame extends JFrame {
         section(sidebar, "MAIN");
         DashboardPanel dashboard = new DashboardPanel("Welcome, " + loggedInStaff.getFirstName() + " (" + loggedInStaff.getRole() + ")");
         addModule(sidebar, "Dashboard", "Quick overview of vehicles, rentals, reservations, income, and expenses.", dashboard);
-        addModule(sidebar, "Vehicle Fleet", "Add and maintain vehicles, availability, rates, and photos.",
-            new VehiclePanel(loggedInStaff));
-        dashboard.setOnViewFleet(() -> showModule("Vehicle Fleet"));
+        addModule(sidebar, "Vehicles", "Manage the vehicle fleet and its car suppliers.",
+            buildTabbedModule(
+                new String[] {"Vehicle Fleet", "Vehicle Suppliers"},
+                new String[] {
+                    "Add and maintain vehicles, availability, rates, and photos.",
+                    "Manage suppliers that provide vehicles to the fleet."
+                },
+                new JPanel[] { new VehiclePanel(loggedInStaff), new SuppliersPanel(loggedInStaff, model.Supplier.TYPE_CAR) }
+            ));
+        dashboard.setOnViewFleet(() -> showModule("Vehicles"));
         addModule(sidebar, "Customer Accounts", "View and manage customer profiles and account details.",
             new CustomerPanel(loggedInStaff));
         section(sidebar, "OPERATIONS");

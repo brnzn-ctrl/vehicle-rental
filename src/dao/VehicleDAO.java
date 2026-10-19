@@ -10,9 +10,10 @@ import java.sql.SQLException;
 public class VehicleDAO extends AbstractDAO<Vehicle> {
 
     private static final String BASE_SELECT =
-        "SELECT v.vehicle_id, v.plate_number, v.vehicle_name, v.category_id, c.category_name, " +
-        "       v.daily_rate, v.status, v.image_filename " +
-        "FROM vehicles v INNER JOIN vehicle_categories c ON v.category_id = c.category_id";
+        "SELECT v.vehicle_id, v.plate_number, v.vehicle_name, v.category_id, v.supplier_id, c.category_name, sup.supplier_name, " +
+        "       v.daily_rate, v.unit_price, v.quantity, v.status, v.image_filename " +
+        "FROM vehicles v INNER JOIN vehicle_categories c ON v.category_id = c.category_id " +
+        "LEFT JOIN suppliers sup ON v.supplier_id = sup.supplier_id";
 
     @Override protected String selectAllSql()  { return BASE_SELECT + " ORDER BY v.vehicle_name"; }
     @Override protected String[] searchColumns() { return new String[]{ "v.vehicle_id", "v.plate_number", "v.vehicle_name", "c.category_name", "v.daily_rate", "v.status" }; }
@@ -20,12 +21,12 @@ public class VehicleDAO extends AbstractDAO<Vehicle> {
     @Override protected String deleteSql()     { return "DELETE FROM vehicles WHERE vehicle_id=?"; }
 
     @Override protected String insertSql() {
-        return "INSERT INTO vehicles(plate_number, vehicle_name, category_id, daily_rate, status, image_filename) " +
-               "VALUES (?,?,?,?,?,?)";
+        return "INSERT INTO vehicles(plate_number, vehicle_name, category_id, daily_rate, unit_price, quantity, status, image_filename, supplier_id) " +
+               "VALUES (?,?,?,?,?,?,?,?,?)";
     }
 
     @Override protected String updateSql() {
-        return "UPDATE vehicles SET plate_number=?, vehicle_name=?, category_id=?, daily_rate=?, status=?, image_filename=? " +
+        return "UPDATE vehicles SET plate_number=?, vehicle_name=?, category_id=?, daily_rate=?, unit_price=?, quantity=?, status=?, image_filename=?, supplier_id=? " +
                "WHERE vehicle_id=?";
     }
 
@@ -37,9 +38,14 @@ public class VehicleDAO extends AbstractDAO<Vehicle> {
             v.setName(rs.getString("vehicle_name"));
             v.setCategoryId(rs.getInt("category_id"));
             v.setCategoryName(rs.getString("category_name"));
+            v.setSupplierName(rs.getString("supplier_name"));
             v.setDailyRate(rs.getBigDecimal("daily_rate"));
+            v.setUnitPrice(rs.getBigDecimal("unit_price"));
+            v.setQuantity(rs.getInt("quantity"));
             v.setStatus(rs.getString("status"));
             v.setImageFilename(rs.getString("image_filename"));
+            int supplierId = rs.getInt("supplier_id");
+            v.setSupplierId(rs.wasNull() ? null : supplierId);
             return v;
         };
     }
@@ -50,8 +56,12 @@ public class VehicleDAO extends AbstractDAO<Vehicle> {
             ps.setString(2, v.getName());
             ps.setInt(3, v.getCategoryId());
             ps.setBigDecimal(4, v.getDailyRate());
-            ps.setString(5, v.getStatus());
-            ps.setString(6, v.getImageFilename());
+            ps.setBigDecimal(5, v.getUnitPrice());
+            ps.setInt(6, v.getQuantity());
+            ps.setString(7, v.getStatus());
+            ps.setString(8, v.getImageFilename());
+            if (v.getSupplierId() == null) ps.setNull(9, java.sql.Types.INTEGER);
+            else ps.setInt(9, v.getSupplierId());
         };
     }
 
@@ -61,9 +71,13 @@ public class VehicleDAO extends AbstractDAO<Vehicle> {
             ps.setString(2, v.getName());
             ps.setInt(3, v.getCategoryId());
             ps.setBigDecimal(4, v.getDailyRate());
-            ps.setString(5, v.getStatus());
-            ps.setString(6, v.getImageFilename());
-            ps.setInt(7, v.getId()); // WHERE vehicle_id=?
+            ps.setBigDecimal(5, v.getUnitPrice());
+            ps.setInt(6, v.getQuantity());
+            ps.setString(7, v.getStatus());
+            ps.setString(8, v.getImageFilename());
+            if (v.getSupplierId() == null) ps.setNull(9, java.sql.Types.INTEGER);
+            else ps.setInt(9, v.getSupplierId());
+            ps.setInt(10, v.getId()); // WHERE vehicle_id=?
         };
     }
 

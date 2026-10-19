@@ -157,8 +157,7 @@ public class ExpensesPanel extends JPanel {
     private void deleteExpense() {
         if (!AccessControl.requireAdmin(this, loggedInStaff, "delete expenses")) return;
         if (selected == null) { JOptionPane.showMessageDialog(this, "Select an expense first."); return; }
-        int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to delete this record?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (!DeleteConfirmation.confirm(this, selected.getCategory())) return;
         expenseDAO.delete(selected.getId());
         JOptionPane.showMessageDialog(this, "Expense deleted.");
         clearForm();

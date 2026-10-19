@@ -295,9 +295,11 @@ public final class ModernUI {
             boolean hover = b.getModel().isRollover() && b.isEnabled();
             boolean prim = primary(b);
             boolean flat = Boolean.TRUE.equals(b.getClientProperty("ui.flat"));
+            boolean customBackground = Boolean.TRUE.equals(b.getClientProperty("ui.customBackground"));
             if (!flat) {
                 Color fill;
                 if (!b.isEnabled()) fill = prim ? new Color(255, 170, 180) : new Color(244, 246, 250);
+                else if (customBackground) fill = b.getBackground();
                 else if (prim) fill = pressed ? new Color(200, 20, 45) : hover ? UITheme.RED_ACCENT_HOVER : UITheme.RED_ACCENT;
                 else fill = pressed ? UITheme.TINT : hover ? new Color(246, 249, 253) : Color.WHITE;
                 g2.setColor(fill);

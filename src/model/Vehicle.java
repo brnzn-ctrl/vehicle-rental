@@ -9,8 +9,12 @@ public class Vehicle extends Entity {
     private int categoryId;
     private String categoryName;   // filled by JOIN, convenient for the table view
     private BigDecimal dailyRate;
+    private BigDecimal unitPrice = BigDecimal.ZERO;
+    private int quantity = 1;
     private String status;   // available | rented | maintenance | inactive
     private String imageFilename;   // e.g. "12.png", stored in VehicleImages/ next to the .jar
+    private Integer supplierId;
+    private String supplierName;
 
     /** Empty constructor: used when a row is read from the database or a form is filled in. */
     public Vehicle() { }
@@ -37,10 +41,18 @@ public class Vehicle extends Entity {
     public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
     public BigDecimal getDailyRate() { return dailyRate; }
     public void setDailyRate(BigDecimal dailyRate) { this.dailyRate = dailyRate; }
+    public BigDecimal getUnitPrice() { return unitPrice; }
+    public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
+    public int getQuantity() { return quantity; }
+    public void setQuantity(int quantity) { this.quantity = quantity; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public String getImageFilename() { return imageFilename; }
     public void setImageFilename(String imageFilename) { this.imageFilename = imageFilename; }
+    public Integer getSupplierId() { return supplierId; }
+    public void setSupplierId(Integer supplierId) { this.supplierId = supplierId; }
+    public String getSupplierName() { return supplierName; }
+    public void setSupplierName(String supplierName) { this.supplierName = supplierName; }
 
     @Override public String toString() { return name; }
 }

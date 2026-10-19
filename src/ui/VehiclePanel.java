@@ -20,13 +20,19 @@ import util.ErrorHandler;
 
 import util.ImageUtil;
 
+import util.UITheme;
+
 import dao.VehicleCategoryDAO;
 
 import dao.VehicleDAO;
 
+import dao.SupplierDAO;
+
 import model.Vehicle;
 
 import model.VehicleCategory;
+
+import model.Supplier;
 
 import javax.imageio.ImageIO;
 
@@ -64,21 +70,19 @@ public class VehiclePanel extends JPanel {
 
     private final VehicleCategoryDAO categoryDAO = new VehicleCategoryDAO();
 
+    private final SupplierDAO supplierDAO = new SupplierDAO();
+
 
 
     private final DefaultTableModel tableModel =
 
-        new DefaultTableModel(new Object[]{"ID", "Plate", "Name", "Category", "Rate/day", "Status"}, 0) {
+        new DefaultTableModel(new Object[]{"ID", "Plate", "Name", "Category", "Rate/day", "Unit Price", "Quantity", "Supplier", "Status"}, 0) {
 
             @Override public boolean isCellEditable(int r, int c) { return false; }
 
         };
 
     private final JTable table = new JTable(tableModel);
-
-    private final JTextField txtId = FormSupport.idField();   // read-only, filled when a row is selected
-
-
 
     private final JTextField txtPlate = new JTextField(15);
 
@@ -87,6 +91,12 @@ public class VehiclePanel extends JPanel {
     private final JComboBox<VehicleCategory> cboCategory = new JComboBox<>();
 
     private final JTextField txtRate = new JTextField(10);
+
+    private final JTextField txtUnitPrice = new JTextField("0", 10);
+
+    private final JSpinner spnQuantity = createQuantitySpinner();
+
+    private final JComboBox<Supplier> cboSupplier = new JComboBox<>();
 
     private final JComboBox<String> cboStatus = new JComboBox<>(new String[]{"available", "rented", "maintenance", "inactive"});
 
@@ -103,6 +113,41 @@ public class VehiclePanel extends JPanel {
 
 
     private final Staff loggedInStaff;   // used for the admin-only Delete
+
+    private static JSpinner createQuantitySpinner() {
+        JSpinner spinner = new JSpinner(new SpinnerNumberModel(1, 1, 999999, 1));
+        spinner.setBackground(Color.WHITE);
+        spinner.setForeground(UITheme.TEXT_LIGHT);
+        JComponent editor = spinner.getEditor();
+        if (editor instanceof JSpinner.DefaultEditor) {
+            JFormattedTextField field = ((JSpinner.DefaultEditor) editor).getTextField();
+            field.setColumns(4);
+            field.setFont(UITheme.FONT_BODY);
+            field.setForeground(UITheme.TEXT_LIGHT);
+            field.setBackground(Color.WHITE);
+            field.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+        }
+        for (Component component : spinner.getComponents()) {
+            if (component instanceof javax.swing.plaf.basic.BasicArrowButton) {
+                JButton button = (JButton) component;
+                javax.swing.plaf.basic.BasicArrowButton arrow =
+                    (javax.swing.plaf.basic.BasicArrowButton) component;
+                button.setText(arrow.getDirection() == SwingConstants.NORTH ? "▲" : "▼");
+                button.setUI(new util.ModernUI.ButtonUI());
+                button.setBackground(Color.WHITE);
+                button.setForeground(UITheme.RED_ACCENT);
+                button.setFont(UITheme.font(Font.BOLD, 9));
+                button.setMargin(new Insets(0, 0, 0, 0));
+                button.setBorder(BorderFactory.createEmptyBorder());
+                button.setPreferredSize(new Dimension(20, 15));
+                button.setMinimumSize(new Dimension(20, 15));
+                button.setMaximumSize(new Dimension(20, 15));
+            }
+        }
+        spinner.setBorder(UIManager.getBorder("TextField.border"));
+        spinner.setPreferredSize(new Dimension(100, 34));
+        return spinner;
+    }
 
 
 
@@ -140,11 +185,19 @@ public class VehiclePanel extends JPanel {
 
         addComponentListener(new java.awt.event.ComponentAdapter() {
 
-            @Override public void componentShown(java.awt.event.ComponentEvent e) { VehicleCategory keep = (VehicleCategory) cboCategory.getSelectedItem(); loadCategories(); if (keep != null) selectComboByCategoryId(keep.getId()); refreshTable(); }
+            @Override public void componentShown(java.awt.event.ComponentEvent e) {
+                VehicleCategory keep = (VehicleCategory) cboCategory.getSelectedItem();
+                loadCategories();
+                if (keep != null) selectComboByCategoryId(keep.getId());
+                loadCarSuppliers();
+                refreshTable();
+            }
 
         });
 
         loadCategories();
+
+        loadCarSuppliers();
 
         refreshTable();
 
@@ -166,13 +219,17 @@ public class VehiclePanel extends JPanel {
 
         int row = 0;
 
-        addField(form, gc, row++, "ID:", txtId);
-
-        addField(form, gc, row++, "Plate Number:", txtPlate);
+        addField(form, gc, row++, "Supplier:", cboSupplier);
 
         addField(form, gc, row++, "Vehicle Name:", txtName);
 
+        addField(form, gc, row++, "Plate Number:", txtPlate);
+
         addField(form, gc, row++, "Category:", cboCategory);
+
+        addField(form, gc, row++, "Quantity:", spnQuantity);
+
+        addField(form, gc, row++, "Unit Price:", txtUnitPrice);
 
         addField(form, gc, row++, "Daily Rate:", txtRate);
 
@@ -185,13 +242,12 @@ public class VehiclePanel extends JPanel {
         lblPreview.setBorder(BorderFactory.createLineBorder(Color.GRAY));
 
         lblPreview.setHorizontalAlignment(SwingConstants.CENTER);
-
         lblPreview.setText("No Photo");
 
-        gc.gridx = 2; gc.gridy = 0; gc.gridheight = 5;
-
+        gc.gridx = 2; gc.gridy = 0; gc.gridheight = 8;
+        form.add(Box.createHorizontalStrut(42), gc);
+        gc.gridx = 3; gc.gridy = 0; gc.gridheight = 8;
         form.add(lblPreview, gc);
-
         gc.gridheight = 1;
 
 
@@ -210,11 +266,22 @@ public class VehiclePanel extends JPanel {
 
 
 
-        gc.gridx = 3; gc.gridy = 0; form.add(btnUpload, gc);
-
-        gc.gridy = 1; form.add(btnCrop, gc);
-
-        gc.gridy = 2; form.add(btnRemovePhoto, gc);
+        JPanel photoButtons = new JPanel();
+        photoButtons.setLayout(new BoxLayout(photoButtons, BoxLayout.Y_AXIS));
+        photoButtons.setOpaque(false);
+        btnUpload.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btnCrop.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btnRemovePhoto.setAlignmentX(Component.CENTER_ALIGNMENT);
+        photoButtons.add(btnUpload);
+        photoButtons.add(Box.createVerticalStrut(8));
+        photoButtons.add(btnCrop);
+        photoButtons.add(Box.createVerticalStrut(8));
+        photoButtons.add(btnRemovePhoto);
+        gc.gridx = 4; gc.gridy = 0; gc.gridheight = 8;
+        gc.anchor = GridBagConstraints.CENTER;
+        form.add(photoButtons, gc);
+        gc.gridheight = 1;
+        gc.anchor = GridBagConstraints.WEST;
 
 
 
@@ -280,6 +347,26 @@ public class VehiclePanel extends JPanel {
 
     }
 
+    private void loadCarSuppliers() {
+        Integer keepId = cboSupplier.getSelectedItem() == null
+            ? null : ((Supplier) cboSupplier.getSelectedItem()).getId();
+        cboSupplier.removeAllItems();
+        cboSupplier.addItem(null);
+        for (Supplier supplier : supplierDAO.findByType(Supplier.TYPE_CAR)) cboSupplier.addItem(supplier);
+        selectSupplier(keepId);
+    }
+
+    private void selectSupplier(Integer supplierId) {
+        for (int i = 0; i < cboSupplier.getItemCount(); i++) {
+            Supplier supplier = cboSupplier.getItemAt(i);
+            if ((supplier == null && supplierId == null)
+                    || (supplier != null && supplierId != null && supplier.getId() == supplierId)) {
+                cboSupplier.setSelectedIndex(i);
+                return;
+            }
+        }
+    }
+
 
 
     /** Keyword currently typed in the search box ("" = show all). */
@@ -302,6 +389,7 @@ public class VehiclePanel extends JPanel {
         VehicleCategory keep = (VehicleCategory) cboCategory.getSelectedItem();
         loadCategories();
         if (keep != null) selectComboByCategoryId(keep.getId());
+        loadCarSuppliers();
         refreshTable();
     }
 
@@ -311,7 +399,9 @@ public class VehiclePanel extends JPanel {
 
         for (Vehicle v : vehicleDAO.search(keyword)) {
 
-            tableModel.addRow(new Object[]{v.getId(), v.getPlateNumber(), v.getName(), v.getCategoryName(), v.getDailyRate(), v.getStatus()});
+            tableModel.addRow(new Object[]{v.getId(), v.getPlateNumber(), v.getName(), v.getCategoryName(),
+                v.getDailyRate(), v.getUnitPrice(), v.getQuantity(),
+                v.getSupplierName() == null ? "" : v.getSupplierName(), v.getStatus()});
 
         }
 
@@ -339,19 +429,21 @@ public class VehiclePanel extends JPanel {
 
         }
 
-        FormSupport.showId(txtId, selected.getId());
-
-
-
         txtPlate.setText(selected.getPlateNumber());
 
         txtName.setText(selected.getName());
 
         txtRate.setText(selected.getDailyRate().toString());
 
+        txtUnitPrice.setText(selected.getUnitPrice() == null ? "" : selected.getUnitPrice().toPlainString());
+
+        spnQuantity.setValue(selected.getQuantity());
+
         cboStatus.setSelectedItem(selected.getStatus());
 
         selectComboByCategoryId(selected.getCategoryId());
+
+        selectSupplier(selected.getSupplierId());
 
 
 
@@ -535,9 +627,7 @@ public class VehiclePanel extends JPanel {
 
         if (selected == null) { JOptionPane.showMessageDialog(this, "Select a vehicle first."); return; }
 
-        int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to delete this record?\n" + selected.getPlateNumber(), "Confirm Delete", JOptionPane.YES_NO_OPTION);
-
-        if (confirm != JOptionPane.YES_OPTION) return;
+        if (!DeleteConfirmation.confirm(this, selected.getPlateNumber())) return;
 
         vehicleDAO.delete(selected.getId());
 
@@ -609,6 +699,16 @@ public class VehiclePanel extends JPanel {
 
         }
 
+        BigDecimal unitPrice = Validator.parseNonNegative(txtUnitPrice.getText());
+
+        if (unitPrice == null) {
+
+            JOptionPane.showMessageDialog(this, "Unit price must be a number that is 0 or greater.");
+
+            return null;
+
+        }
+
 
 
         // "rented" must always match the rentals table: it is set by Rentals > Check Out and cleared by Return & Pay,
@@ -645,6 +745,14 @@ public class VehiclePanel extends JPanel {
 
         v.setDailyRate(rate);
 
+        v.setUnitPrice(unitPrice);
+
+        v.setQuantity((Integer) spnQuantity.getValue());
+
+        Supplier supplier = (Supplier) cboSupplier.getSelectedItem();
+
+        v.setSupplierId(supplier == null ? null : supplier.getId());
+
         v.setStatus((String) cboStatus.getSelectedItem());
 
         return v;
@@ -657,8 +765,6 @@ public class VehiclePanel extends JPanel {
 
         selected = null;
 
-        txtId.setText("");
-
         stagedImage = null;
 
         existingImageFilename = null;
@@ -668,6 +774,12 @@ public class VehiclePanel extends JPanel {
         txtName.setText("");
 
         txtRate.setText("");
+
+        txtUnitPrice.setText("0");
+
+        spnQuantity.setValue(1);
+
+        selectSupplier(null);
 
         cboStatus.setSelectedIndex(0);
 

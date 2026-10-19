@@ -107,7 +107,7 @@ public final class DatePickerField extends JPanel {
         private YearMonth displayedMonth;
         private final JLabel monthLabel = new JLabel("", SwingConstants.CENTER);
         private final JPanel daysPanel = new JPanel(new GridLayout(0, 7, 4, 4));
-        private final Color selectedColor = new Color(8, 45, 110);
+        private final Color selectedColor = UITheme.NAVY;
 
         DatePickerDialog(Window owner, LocalDate initialDate) {
             super(owner, "Choose Date", ModalityType.APPLICATION_MODAL);
@@ -181,6 +181,7 @@ public final class DatePickerField extends JPanel {
                 button.setOpaque(true);
                 button.setBackground(candidate.equals(selectedDate) ? selectedColor : Color.WHITE);
                 button.setForeground(candidate.equals(selectedDate) ? Color.WHITE : UITheme.TEXT_LIGHT);
+                button.putClientProperty("ui.customBackground", candidate.equals(selectedDate));
                 button.setBorder(BorderFactory.createLineBorder(
                     candidate.equals(LocalDate.now()) ? UITheme.RED_ACCENT : new Color(205, 215, 230)));
                 button.addActionListener(e -> chooseDate(candidate));
