@@ -71,7 +71,7 @@ public class MainFrame extends JFrame {
         // Every module screen is registered here (Reports and the admin modules only for administrators).
         section(sidebar, "MAIN");
         DashboardPanel dashboard = new DashboardPanel("Welcome, " + loggedInStaff.getFirstName() + " (" + loggedInStaff.getRole() + ")");
-        addModule(sidebar, "Dashboard", "Quick overview of vehicles, rentals, reservations, income, and expenses.", dashboard);
+        addModule(sidebar, "Dashboard", "Quick overview of vehicles, rentals, reservations, revenue, and expenses.", dashboard);
         addModule(sidebar, "Vehicles", "Manage the vehicle fleet and its car suppliers.",
             buildTabbedModule(
                 new String[] {"Vehicle Fleet", "Vehicle Suppliers"},
@@ -117,11 +117,11 @@ public class MainFrame extends JFrame {
         // Reports is admin-only — employees don't see it in the sidebar at all.
         if (isAdmin) {
             section(sidebar, "ADMIN");
-            addModule(sidebar, "Reports & Analytics", "Review income summaries, charts, and detailed business reports.",
+            addModule(sidebar, "Reports & Analytics", "Review revenue summaries, charts, and detailed business reports.",
                 buildTabbedModule(
                     new String[] {"Summary Reports", "Detailed Reports"},
                     new String[] {
-                        "View income by vehicle category and calculate income for a selected date range.",
+                        "View revenue by vehicle category and calculate revenue for a selected date range.",
                         "Generate focused reports for customers, vehicles, rentals, inventory, and transactions."
                     },
                     new JPanel[] { new ReportsPanel(), new DetailedReportsPanel() }

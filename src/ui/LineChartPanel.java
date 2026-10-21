@@ -22,6 +22,7 @@ public class LineChartPanel extends JPanel {
 
     private String[] labels = new String[0];
     private final List<Series> series = new ArrayList<>();
+    private final List<Series> tooltipSeries = new ArrayList<>();
     private int hover = -1;
 
     public LineChartPanel() {
@@ -35,9 +36,15 @@ public class LineChartPanel extends JPanel {
     }
 
     public void setData(String[] labels, List<Series> list) {
+        setData(labels, list, List.of());
+    }
+
+    public void setData(String[] labels, List<Series> list, List<Series> tooltipSeries) {
         this.labels = labels;
         series.clear();
         series.addAll(list);
+        this.tooltipSeries.clear();
+        this.tooltipSeries.addAll(tooltipSeries);
         repaint();
     }
 
@@ -145,6 +152,7 @@ public class LineChartPanel extends JPanel {
     private void tooltip(Graphics2D g2, double step, double max, int ch) {
         List<Series> shown = new ArrayList<>();
         for (Series s : series) if (hover < s.values.length) shown.add(s);
+        for (Series s : tooltipSeries) if (hover < s.values.length) shown.add(s);
         if (shown.isEmpty()) return;
         int rows = shown.size();
         Font title = UITheme.font(Font.BOLD, 12), body = UITheme.font(Font.PLAIN, 12);

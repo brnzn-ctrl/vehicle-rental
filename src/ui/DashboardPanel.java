@@ -147,7 +147,7 @@ public class DashboardPanel extends JPanel {
     private JComponent statRow(Map<String, String> s) {
         JPanel row = new JPanel(new GridLayout(1, 4, 14, 0));
         row.setOpaque(false);
-        row.add(statCard("peso", "Total Income", money(s.get("Total Income (PHP)")), "All recorded payments", UITheme.RED_ACCENT));
+        row.add(statCard("peso", "Total Revenue", money(s.get("Total Revenue (PHP)")), "All recorded payments", UITheme.RED_ACCENT));
         row.add(statCard("wallet", "Total Expenses", money(s.get("Total Expenses (PHP)")), "All recorded expenses", UITheme.NAVY));
         row.add(statCard("card", "Today's Payments", money(s.get("Today's Payments (PHP)")), "Collected today", UITheme.GREEN_MONEY));
         row.add(statCard("users", "Customers", num(s.get("Customers")), "Active accounts", UITheme.BLUE));
@@ -193,24 +193,28 @@ public class DashboardPanel extends JPanel {
         GridBagConstraints gc = new GridBagConstraints();
         gc.fill = GridBagConstraints.BOTH; gc.gridy = 0; gc.weighty = 1;
 
-        // earnings summary (line chart: income as red area, expenses as navy line)
+        // earnings summary (line chart: revenue as red area, expenses as navy line)
         Card earnings = new Card(new BorderLayout());
         JPanel legend = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         legend.setOpaque(false);
-        legend.add(dot("Income", UITheme.RED_ACCENT));
+        legend.add(dot("Revenue", UITheme.RED_ACCENT));
         legend.add(dot("Expenses", UITheme.NAVY));
         legend.add(Card.chip(String.valueOf(year)));
         earnings.add(Card.header("Earnings Summary", legend), BorderLayout.NORTH);
         int upTo = LocalDate.now().getYear() == year ? LocalDate.now().getMonthValue() : 12;   // do not draw months that have not happened yet
-        double[] inc = new double[upTo], exp = new double[upTo];
+        double[] revenueValues = new double[upTo], expenseValues = new double[upTo], netIncomeValues = new double[upTo];
         for (int m = 1; m <= upTo; m++) {
-            inc[m - 1] = income.getOrDefault(m, BigDecimal.ZERO).doubleValue();
-            exp[m - 1] = expense.getOrDefault(m, BigDecimal.ZERO).doubleValue();
+            BigDecimal revenue = income.getOrDefault(m, BigDecimal.ZERO);
+            BigDecimal expenses = expense.getOrDefault(m, BigDecimal.ZERO);
+            revenueValues[m - 1] = revenue.doubleValue();
+            expenseValues[m - 1] = expenses.doubleValue();
+            netIncomeValues[m - 1] = revenue.subtract(expenses).doubleValue();
         }
         LineChartPanel chart = new LineChartPanel();
         chart.setData(MONTHS, List.of(
-            new LineChartPanel.Series("Expenses", UITheme.NAVY, exp, false),
-            new LineChartPanel.Series("Income", UITheme.RED_ACCENT, inc, true)));
+            new LineChartPanel.Series("Expenses", UITheme.NAVY, expenseValues, false),
+            new LineChartPanel.Series("Revenue", UITheme.RED_ACCENT, revenueValues, true)),
+            List.of(new LineChartPanel.Series("Net Income", UITheme.GREEN_MONEY, netIncomeValues, false)));
         chart.setPreferredSize(new Dimension(300, 250));
         earnings.add(chart, BorderLayout.CENTER);
         gc.gridx = 0; gc.weightx = 1; gc.insets = new Insets(0, 0, 0, 14);

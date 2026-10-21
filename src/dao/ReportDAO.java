@@ -37,20 +37,29 @@ public class ReportDAO {
         return result;
     }
 
-    /** Total income between two dates (inclusive) — for the MP5 date-range requirement. */
-    public BigDecimal totalIncomeBetween(java.time.LocalDate from, java.time.LocalDate to) {
-        String sql =
-            "SELECT COALESCE(SUM(p.amount),0) AS total FROM payments p " +
-            "WHERE DATE(p.payment_date) BETWEEN ? AND ?";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+    /** Net income between two dates (inclusive): payments minus expenses and stock receipt costs. */
+    public BigDecimal netIncomeBetween(java.time.LocalDate from, java.time.LocalDate to) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            BigDecimal revenue = sumBetween(conn,
+                "SELECT COALESCE(SUM(amount), 0) FROM payments WHERE DATE(payment_date) BETWEEN ? AND ?", from, to);
+            BigDecimal expenses = sumBetween(conn,
+                "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE expense_date BETWEEN ? AND ?", from, to);
+            BigDecimal stockReceipts = sumBetween(conn,
+                "SELECT COALESCE(SUM(quantity * unit_cost), 0) FROM inventory_stock WHERE DATE(date_received) BETWEEN ? AND ?", from, to);
+            return revenue.subtract(expenses).subtract(stockReceipts);
+        } catch (SQLException e) {
+            throw new DataAccessException("netIncomeBetween", e);
+        }
+    }
+
+    private BigDecimal sumBetween(Connection conn, String sql, java.time.LocalDate from, java.time.LocalDate to)
+            throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setDate(1, java.sql.Date.valueOf(from));
             ps.setDate(2, java.sql.Date.valueOf(to));
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getBigDecimal("total") : BigDecimal.ZERO;
+                return rs.next() ? rs.getBigDecimal(1) : BigDecimal.ZERO;
             }
-        } catch (SQLException e) {
-            throw new DataAccessException("totalIncomeBetween", e);
         }
     }
 }
